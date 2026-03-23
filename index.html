@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Atlas of Irish Traditional Music</title>
+    <meta
+      name="description"
+      content="A map-first atlas of Irish Traditional Music, linking places across Ireland to their associated tunes."
+    />
+    <link rel="icon" type="image/png" href="./assets/icons/irish-trad-music-icon.png" />
+    <link rel="apple-touch-icon" href="./assets/icons/irish-trad-music-icon.png" />
+    <link
+      rel="stylesheet"
+      href="https://api.mapbox.com/mapbox-gl-js/v3.20.0/mapbox-gl.css"
+    />
+    <link rel="stylesheet" href="./styles/site.css" />
+    <script
+      defer
+      src="https://api.mapbox.com/mapbox-gl-js/v3.20.0/mapbox-gl.js"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+    ></script>
+  </head>
+  <body>
+    <div id="appShell" class="app-shell">
+      <div id="mapShell" class="map-shell"></div>
+
+      <div id="mobileTopbar" class="mobile-topbar" aria-hidden="true">
+        <div class="mobile-topbar__inner">
+          <div class="mobile-topbar__brand">
+            <img
+              class="mobile-topbar__mark"
+              src="./assets/icons/irish-trad-music-icon.png"
+              alt=""
+            />
+            <span class="mobile-topbar__title site-title-text">
+              <span class="mobile-topbar__line">Atlas of Irish</span>
+              <span class="mobile-topbar__line">Traditional Music</span>
+            </span>
+          </div>
+
+          <div class="mobile-topbar__actions">
+            <button
+              id="mobileSidebarToggle"
+              class="mobile-panel-toggle mobile-panel-toggle--secondary is-hidden"
+              type="button"
+              aria-label="Open menu"
+              aria-controls="sidebar"
+              aria-expanded="false"
+            >
+              <span class="mobile-panel-toggle__state" data-mobile-sidebar-state aria-hidden="true">
+                Menu
+              </span>
+            </button>
+
+            <button
+              id="mobileLegendToggle"
+              class="mobile-panel-toggle mobile-panel-toggle--secondary is-hidden"
+              type="button"
+              aria-label="Open map legend"
+              aria-controls="mapLegend"
+              aria-expanded="false"
+            >
+              Legend
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <aside id="sidebar" class="sidebar sidebar--expanded" aria-hidden="false">
+        <div class="sidebar__chrome">
+          <span class="sidebar__sheet-handle" aria-hidden="true"></span>
+
+          <div class="sidebar__brand" aria-hidden="true">
+            <div class="sidebar__brand-copy">
+              <img
+                class="sidebar__brand-mark"
+                src="./assets/icons/irish-trad-music-icon.png"
+                alt=""
+              />
+              <span class="sidebar__brand-text site-title-text">
+                <span class="sidebar__brand-line">Atlas of Irish Traditional Music</span>
+              </span>
+            </div>
+          </div>
+
+          <nav id="sidebarTabs" class="sidebar__tabs" aria-label="Sidebar tabs">
+            <button
+              class="tab-button tab-button--active"
+              type="button"
+              data-action="switch-tab"
+              data-tab="overview"
+              aria-pressed="true"
+              title="Overview"
+            >
+              <span class="tab-button__short">O</span>
+              <span class="tab-button__label">Overview</span>
+            </button>
+            <button
+              class="tab-button"
+              type="button"
+              data-action="switch-tab"
+              data-tab="places"
+              aria-pressed="false"
+              title="Places"
+            >
+              <span class="tab-button__short">P</span>
+              <span class="tab-button__label">Place</span>
+            </button>
+            <button
+              class="tab-button"
+              type="button"
+              data-action="switch-tab"
+              data-tab="tunes"
+              aria-pressed="false"
+              title="Tunes"
+            >
+              <span class="tab-button__short">T</span>
+              <span class="tab-button__label">Tune</span>
+            </button>
+          </nav>
+        </div>
+
+        <div id="sidebarContent" class="sidebar__content"></div>
+      </aside>
+
+      <div id="statusOverlay" class="app-state">
+        <div class="app-state__card">
+          <p class="eyebrow site-title-text">Atlas of Irish Traditional Music</p>
+          <h1>Loading the atlas...</h1>
+          <p>Fetching places, linked tunes, and map-ready metadata.</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./scripts/app.js"></script>
+  </body>
+</html>
