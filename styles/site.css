@@ -2230,6 +2230,13 @@ select option {
     font-size: 0.94rem;
   }
 
+  .sidebar--mobile .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 12px;
+    align-items: start;
+  }
+
   .sidebar--mobile .panel-title,
   .sidebar--mobile .detail-title {
     font-size: clamp(1.44rem, 4.8vw, 1.92rem);

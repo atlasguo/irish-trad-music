@@ -789,13 +789,21 @@ function renderPlacesList(context) {
   `;
 }
 
-function renderPlaceDetail(context) {
+function renderPlaceDetail(context, backLink) {
   const { selectedPlace } = context;
+  const resolvedBackLink = backLink || {
+    action: "back-to-places-list",
+    label: "Back to places",
+  };
 
   return `
     <div class="sidebar-section">
-      <button class="back-link" type="button" data-action="back-to-places-list">
-        Back to places
+      <button
+        class="back-link"
+        type="button"
+        data-action="${escapeHtml(resolvedBackLink.action)}"
+      >
+        ${escapeHtml(resolvedBackLink.label)}
       </button>
 
       <header class="detail-header">
@@ -945,13 +953,21 @@ function renderTunesList(context) {
   `;
 }
 
-function renderTuneDetail(context, tuneAudioState) {
+function renderTuneDetail(context, tuneAudioState, backLink) {
   const { selectedTune, atlasData } = context;
+  const resolvedBackLink = backLink || {
+    action: "back-to-tunes-list",
+    label: "Back to tunes",
+  };
 
   return `
     <div class="sidebar-section">
-      <button class="back-link" type="button" data-action="back-to-tunes-list">
-        Back to tunes
+      <button
+        class="back-link"
+        type="button"
+        data-action="${escapeHtml(resolvedBackLink.action)}"
+      >
+        ${escapeHtml(resolvedBackLink.label)}
       </button>
 
       <header class="detail-header">
@@ -1041,7 +1057,139 @@ export function createUIController({ elements, actions, charts }) {
     places: { scrollTop: 0 },
     tunes: { scrollTop: 0 },
   };
+  const backTargetsByViewKey = new Map();
   let pendingListRestore = null;
+  let pendingBackTargetAssignment = null;
+  let pendingViewRestore = null;
+
+  function getPlaceDetailViewKey(placeId) {
+    return placeId ? `place:${placeId}` : null;
+  }
+
+  function getTuneDetailViewKey(tuneId) {
+    return tuneId ? `tune:${tuneId}` : null;
+  }
+
+  function getSidebarViewKey(state = latestState) {
+    if (!state) {
+      return null;
+    }
+
+    if (state.activeTab === "overview") {
+      return "overview";
+    }
+
+    if (state.activeTab === "places") {
+      return state.selectedPlaceId ? `place:${state.selectedPlaceId}` : "places";
+    }
+
+    if (state.activeTab === "tunes") {
+      return state.selectedTuneId ? `tune:${state.selectedTuneId}` : "tunes";
+    }
+
+    return state.activeTab || null;
+  }
+
+  function createSidebarViewSnapshot(state = latestState) {
+    const viewKey = getSidebarViewKey(state);
+    if (!state || !viewKey) {
+      return null;
+    }
+
+    return {
+      viewKey,
+      activeTab: state.activeTab,
+      selectedPlaceId: state.selectedPlaceId || null,
+      selectedTuneId: state.selectedTuneId || null,
+      scrollTop: elements.sidebarContent.scrollTop,
+    };
+  }
+
+  function rememberBackTarget(targetViewKey, backTargetSnapshot = createSidebarViewSnapshot()) {
+    if (!targetViewKey || !backTargetSnapshot || backTargetSnapshot.viewKey === targetViewKey) {
+      return;
+    }
+
+    pendingBackTargetAssignment = {
+      targetViewKey,
+      backTargetSnapshot,
+    };
+  }
+
+  function getBackTargetForView(state = latestState) {
+    const viewKey = getSidebarViewKey(state);
+    if (!viewKey) {
+      return null;
+    }
+
+    const backTarget = backTargetsByViewKey.get(viewKey);
+    if (!backTarget || backTarget.viewKey === viewKey) {
+      return null;
+    }
+
+    return backTarget;
+  }
+
+  function getBackLinkLabel(backTarget) {
+    if (!backTarget) {
+      return "Back";
+    }
+
+    if (backTarget.activeTab === "overview") {
+      return "Back to overview";
+    }
+
+    if (backTarget.activeTab === "places") {
+      return backTarget.selectedPlaceId ? "Back to place" : "Back to places";
+    }
+
+    if (backTarget.activeTab === "tunes") {
+      return backTarget.selectedTuneId ? "Back to tune" : "Back to tunes";
+    }
+
+    return "Back";
+  }
+
+  function getDetailBackLink(state) {
+    if (state?.activeTab === "places") {
+      const backTarget = getBackTargetForView(state);
+      return backTarget
+        ? { action: "navigate-back", label: getBackLinkLabel(backTarget) }
+        : { action: "back-to-places-list", label: "Back to places" };
+    }
+
+    if (state?.activeTab === "tunes") {
+      const backTarget = getBackTargetForView(state);
+      return backTarget
+        ? { action: "navigate-back", label: getBackLinkLabel(backTarget) }
+        : { action: "back-to-tunes-list", label: "Back to tunes" };
+    }
+
+    return { action: "navigate-back", label: "Back" };
+  }
+
+  function syncBackTargetForCurrentView(previousState, nextState) {
+    const previousViewKey = getSidebarViewKey(previousState);
+    const nextViewKey = getSidebarViewKey(nextState);
+
+    if (!nextViewKey || nextViewKey === previousViewKey) {
+      return;
+    }
+
+    if (pendingBackTargetAssignment?.targetViewKey === nextViewKey) {
+      backTargetsByViewKey.set(nextViewKey, pendingBackTargetAssignment.backTargetSnapshot);
+      pendingBackTargetAssignment = null;
+      return;
+    }
+
+    pendingBackTargetAssignment = null;
+
+    if (pendingViewRestore?.viewKey === nextViewKey) {
+      return;
+    }
+
+    backTargetsByViewKey.delete(nextViewKey);
+  }
 
   function getListViewKey(state = latestState) {
     if (!state) {
@@ -1078,7 +1226,7 @@ export function createUIController({ elements, actions, charts }) {
 
   function restorePendingListSnapshot(viewKey) {
     if (!pendingListRestore || pendingListRestore.viewKey !== viewKey) {
-      return;
+      return false;
     }
 
     elements.sidebarContent.scrollTop = pendingListRestore.scrollTop;
@@ -1086,6 +1234,46 @@ export function createUIController({ elements, actions, charts }) {
       scrollTop: elements.sidebarContent.scrollTop,
     };
     pendingListRestore = null;
+    return true;
+  }
+
+  function queueViewRestore(viewSnapshot) {
+    if (!viewSnapshot?.viewKey) {
+      pendingViewRestore = null;
+      return;
+    }
+
+    pendingViewRestore = { ...viewSnapshot };
+  }
+
+  function restorePendingViewSnapshot(viewKey) {
+    if (!pendingViewRestore || pendingViewRestore.viewKey !== viewKey) {
+      return false;
+    }
+
+    elements.sidebarContent.scrollTop = pendingViewRestore.scrollTop;
+    pendingViewRestore = null;
+    return true;
+  }
+
+  function shouldResetSidebarScroll(previousState, nextState) {
+    const previousViewKey = getSidebarViewKey(previousState);
+    const nextViewKey = getSidebarViewKey(nextState);
+
+    if (!nextViewKey || previousViewKey === nextViewKey) {
+      return false;
+    }
+
+    if (pendingViewRestore?.viewKey === nextViewKey) {
+      return false;
+    }
+
+    const nextListViewKey = getListViewKey(nextState);
+    if (!nextListViewKey) {
+      return true;
+    }
+
+    return pendingListRestore?.viewKey !== nextListViewKey;
   }
 
   function clearPendingTabSwitch() {
@@ -1623,11 +1811,14 @@ export function createUIController({ elements, actions, charts }) {
 
     if (action === "select-place") {
       captureCurrentListSnapshot("places");
+      rememberBackTarget(getPlaceDetailViewKey(placeId));
       actions.selectPlace(placeId);
     } else if (action === "select-tune") {
       captureCurrentListSnapshot("tunes");
+      rememberBackTarget(getTuneDetailViewKey(tuneId));
       actions.selectTune(tuneId, { preservePlace: false, focusMode: "bounds" });
     } else if (action === "select-tune-from-place") {
+      rememberBackTarget(getTuneDetailViewKey(tuneId));
       queueTabCommit("tunes", () => {
         actions.selectTune(tuneId, { preservePlace: true, focusMode: "none" });
       });
@@ -1642,12 +1833,25 @@ export function createUIController({ elements, actions, charts }) {
     } else if (action === "reset-tunes-type-filter") {
       actions.setTunesTypeFilter("all");
     } else if (action === "view-place-on-map") {
+      rememberBackTarget(getPlaceDetailViewKey(placeId));
       if ((latestState?.activeTab ?? null) !== "places") {
         queueTabCommit("places", () => {
           actions.viewPlaceOnMap(placeId);
         });
       } else {
         actions.viewPlaceOnMap(placeId);
+      }
+    } else if (action === "navigate-back") {
+      const backTarget = getBackTargetForView();
+      if (backTarget) {
+        queueViewRestore(backTarget);
+        actions.restoreView(backTarget);
+      } else if (latestState?.activeTab === "places" && latestState.selectedPlaceId) {
+        queueListRestore("places");
+        actions.backToPlacesList();
+      } else if (latestState?.activeTab === "tunes" && latestState.selectedTuneId) {
+        queueListRestore("tunes");
+        actions.backToTunesList();
       }
     } else if (action === "back-to-places-list") {
       queueListRestore("places");
@@ -1704,8 +1908,12 @@ export function createUIController({ elements, actions, charts }) {
         filteredTunes,
         isNarrowViewport,
       } = context;
+      const previousState = latestState;
       const previousCommittedTab = latestState?.activeTab ?? null;
       latestRenderContext = context;
+      const shouldScrollSidebarToTop = shouldResetSidebarScroll(previousState, state);
+      syncBackTargetForCurrentView(previousState, state);
+      const detailBackLink = getDetailBackLink(state);
 
       if (visualActiveTab && previousCommittedTab !== null && state.activeTab !== previousCommittedTab) {
         clearPendingTabSwitch();
@@ -1774,6 +1982,10 @@ export function createUIController({ elements, actions, charts }) {
       if (state.activeTab === "overview") {
         elements.sidebarContent.innerHTML = renderOverview(atlasData);
         restoreFieldState(elements.sidebarContent, fieldState);
+        const restoredOverviewView = restorePendingViewSnapshot("overview");
+        if (!restoredOverviewView && shouldScrollSidebarToTop) {
+          elements.sidebarContent.scrollTop = 0;
+        }
         charts.renderOverviewCharts(
           {
             topPlaces: elements.sidebarContent.querySelector("#topPlacesChart"),
@@ -1782,6 +1994,7 @@ export function createUIController({ elements, actions, charts }) {
           atlasData,
           {
             onPlaceSelect(placeId) {
+              rememberBackTarget(getPlaceDetailViewKey(placeId));
               queueTabCommit("places", () => {
                 actions.selectPlace(placeId);
               });
@@ -1805,29 +2018,41 @@ export function createUIController({ elements, actions, charts }) {
 
       if (state.activeTab === "places") {
         elements.sidebarContent.innerHTML = selectedPlace
-          ? renderPlaceDetail(context)
+          ? renderPlaceDetail(context, detailBackLink)
           : renderPlacesList({
               filteredPlaces,
               state,
               atlasData,
             });
         restoreFieldState(elements.sidebarContent, fieldState);
+        const restoredPlaceView = restorePendingViewSnapshot(getSidebarViewKey(state));
         if (!selectedPlace) {
-          restorePendingListSnapshot("places");
+          const restoredPlacesList = restoredPlaceView || restorePendingListSnapshot("places");
+          if (!restoredPlacesList && shouldScrollSidebarToTop) {
+            elements.sidebarContent.scrollTop = 0;
+          }
+        } else if (!restoredPlaceView && shouldScrollSidebarToTop) {
+          elements.sidebarContent.scrollTop = 0;
         }
         return;
       }
 
       elements.sidebarContent.innerHTML = selectedTune
-        ? renderTuneDetail(context, tuneAudioState)
+        ? renderTuneDetail(context, tuneAudioState, detailBackLink)
         : renderTunesList({
             filteredTunes,
             state,
             atlasData,
           });
       restoreFieldState(elements.sidebarContent, fieldState);
+      const restoredTuneView = restorePendingViewSnapshot(getSidebarViewKey(state));
       if (!selectedTune) {
-        restorePendingListSnapshot("tunes");
+        const restoredTunesList = restoredTuneView || restorePendingListSnapshot("tunes");
+        if (!restoredTunesList && shouldScrollSidebarToTop) {
+          elements.sidebarContent.scrollTop = 0;
+        }
+      } else if (!restoredTuneView && shouldScrollSidebarToTop) {
+        elements.sidebarContent.scrollTop = 0;
       }
     },
   };

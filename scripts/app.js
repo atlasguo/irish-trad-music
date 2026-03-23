@@ -345,6 +345,39 @@ async function bootstrap() {
         actions.selectPlace(placeId);
       },
 
+      restoreView(viewSnapshot) {
+        if (!viewSnapshot) {
+          return;
+        }
+
+        const normalizedTab =
+          viewSnapshot.activeTab === "places" ||
+          viewSnapshot.activeTab === "tunes" ||
+          viewSnapshot.activeTab === "overview"
+            ? viewSnapshot.activeTab
+            : "overview";
+
+        const nextState = {
+          activeTab: normalizedTab,
+          selectedPlaceId: null,
+          selectedTuneId: null,
+          ...getMobileSidebarPanelStatePatch(),
+        };
+
+        if (
+          viewSnapshot.selectedPlaceId &&
+          atlasData.placesById.has(String(viewSnapshot.selectedPlaceId))
+        ) {
+          nextState.selectedPlaceId = String(viewSnapshot.selectedPlaceId);
+        }
+
+        if (viewSnapshot.selectedTuneId && atlasData.tunesById.has(String(viewSnapshot.selectedTuneId))) {
+          nextState.selectedTuneId = String(viewSnapshot.selectedTuneId);
+        }
+
+        setState(nextState);
+      },
+
       backToPlacesList() {
         setState({ selectedPlaceId: null });
       },
