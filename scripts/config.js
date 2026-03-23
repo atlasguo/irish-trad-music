@@ -2,9 +2,6 @@ export const MAPBOX_STYLE =
   "mapbox://styles/atlaskwok/cmmte91f8001501qtepcz9454";
 
 export const MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiYXRsYXNrd29rIiwiYSI6ImNtbjM4c2huYjFoZ2wycHB3MXZzaW41c3gifQ.8s3xn1dB-m49gWBltabckw";
-export const MOBILE_SAFE_PROJECTION = "mercator";
-export const DISABLE_TERRAIN_ON_MOBILE = true;
-export const ENABLE_MAPBOX_DIAGNOSTICS = true;
 
 export const SIDEBAR_BREAKPOINT = 900;
 export const DESKTOP_SIDEBAR_WIDTH = 420;

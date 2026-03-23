@@ -37,8 +37,6 @@ const elements = {
   statusOverlay: document.getElementById("statusOverlay"),
 };
 const MOBILE_TOPBAR_LAYOUT_GAP = 14;
-const REQUIRED_LIBRARY_TIMEOUT_MS = 45000;
-const OPTIONAL_LIBRARY_TIMEOUT_MS = 45000;
 
 function isNarrowViewport() {
   return window.innerWidth < SIDEBAR_BREAKPOINT;
@@ -150,128 +148,26 @@ function hideStatus() {
   elements.statusOverlay.classList.add("is-hidden");
 }
 
-function getScriptBySourceFragment(sourceFragment) {
-  return [...document.scripts].find(
-    (script) => typeof script.src === "string" && script.src.includes(sourceFragment),
-  );
-}
+function waitForLibraries() {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
 
-function waitForWindowGlobal({
-  globalName,
-  sourceFragment,
-  label,
-  timeoutMs = REQUIRED_LIBRARY_TIMEOUT_MS,
-}) {
-  return new Promise((resolve, reject) => {
-    if (window[globalName]) {
-      resolve(window[globalName]);
-      return;
-    }
-
-    const script = getScriptBySourceFragment(sourceFragment);
-    let animationFrameId = null;
-    let timeoutId = null;
-    let settled = false;
-
-    function cleanup() {
-      if (animationFrameId !== null) {
-        window.cancelAnimationFrame(animationFrameId);
-      }
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-
-      if (script) {
-        script.removeEventListener("load", handleScriptLoad);
-        script.removeEventListener("error", handleScriptError);
-      }
-    }
-
-    function finish(callback) {
-      if (settled) {
+    function checkLibraries() {
+      if (window.mapboxgl && window.Chart) {
+        resolve();
         return;
       }
 
-      settled = true;
-      cleanup();
-      callback();
-    }
-
-    function resolveWhenReady() {
-      if (window[globalName]) {
-        finish(() => resolve(window[globalName]));
+      if (Date.now() - startedAt > 10000) {
+        resolve();
         return;
       }
 
-      if (!settled) {
-        animationFrameId = window.requestAnimationFrame(resolveWhenReady);
-      }
+      window.requestAnimationFrame(checkLibraries);
     }
 
-    function handleScriptLoad() {
-      resolveWhenReady();
-    }
-
-    function handleScriptError() {
-      finish(() => {
-        reject(
-          new Error(
-            `${label} failed to load from ${script?.src || sourceFragment}. Check the network request and any blocking rules on the device.`,
-          ),
-        );
-      });
-    }
-
-    if (script) {
-      script.addEventListener("load", handleScriptLoad);
-      script.addEventListener("error", handleScriptError);
-    }
-
-    timeoutId = window.setTimeout(() => {
-      finish(() => {
-        reject(
-          new Error(
-            `${label} did not become available within ${Math.round(timeoutMs / 1000)} seconds. Check the CDN request on the current network.`,
-          ),
-        );
-      });
-    }, timeoutMs);
-
-    resolveWhenReady();
+    checkLibraries();
   });
-}
-
-function monitorOptionalWindowGlobal(options, onReady) {
-  waitForWindowGlobal(options)
-    .then(() => {
-      if (typeof onReady === "function") {
-        onReady();
-      }
-    })
-    .catch((error) => {
-      console.warn(error.message);
-    });
-}
-
-function waitForMapboxLibrary() {
-  return waitForWindowGlobal({
-    globalName: "mapboxgl",
-    sourceFragment: "mapbox-gl.js",
-    label: "Mapbox GL JS",
-  });
-}
-
-function monitorChartLibrary(onReady) {
-  monitorOptionalWindowGlobal(
-    {
-      globalName: "Chart",
-      sourceFragment: "chart.umd.min.js",
-      label: "Chart.js",
-      timeoutMs: OPTIONAL_LIBRARY_TIMEOUT_MS,
-    },
-    onReady,
-  );
 }
 
 function getSelectedPlace(atlasData, state) {
@@ -360,10 +256,8 @@ function getVisibleMapPlaces(atlasData, state, selectedTune) {
 
 async function bootstrap() {
   try {
-    const [atlasData] = await Promise.all([
-      loadAtlasData(),
-      waitForMapboxLibrary(),
-    ]);
+    await waitForLibraries();
+    const atlasData = await loadAtlasData();
     let mapController = null;
     const charts = createChartsController();
 
@@ -577,7 +471,9 @@ async function bootstrap() {
       },
     });
 
-    function renderApp(state) {
+    let wasNarrow = isNarrowViewport();
+
+    subscribe((state) => {
       const selectedPlace = getSelectedPlace(atlasData, state);
       const selectedTune = getSelectedTune(atlasData, state);
       const context = {
@@ -605,18 +501,6 @@ async function bootstrap() {
       requestAnimationFrame(() => {
         mapController.resize();
       });
-    }
-
-    let wasNarrow = isNarrowViewport();
-
-    subscribe((state) => {
-      renderApp(state);
-    });
-
-    monitorChartLibrary(() => {
-      if (getState().activeTab === "overview") {
-        renderApp(getState());
-      }
     });
 
     window.addEventListener("resize", () => {
@@ -639,12 +523,10 @@ async function bootstrap() {
     hideStatus();
     mapController.fitToAtlas(atlasData.bounds, getViewportPadding(getState()));
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "The data files could not be loaded.";
-    const title =
-      /Mapbox GL JS/i.test(message) ? "Unable to load the map" : "Unable to load the atlas";
-
-    renderStatus(title, message);
+    renderStatus(
+      "Unable to load the atlas",
+      error instanceof Error ? error.message : "The data files could not be loaded.",
+    );
   }
 }
 
