@@ -17,51 +17,85 @@ function getTheSessionTuneUrl(tuneId) {
 }
 
 const ABCJS_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/abcjs@6.6.2/dist/abcjs-basic-min.js";
-const DEFAULT_TUNE_AUDIO_STATUS_MESSAGE = "Plays the first The Session setting for this tune.";
+const SMPLR_MODULE_URL = "https://unpkg.com/smplr@0.20.0/dist/index.mjs";
+const DEFAULT_TUNE_AUDIO_STATUS_MESSAGE =
+  "Plays the most popular cached The Session setting for this tune.";
 const DEFAULT_TUNE_AUDIO_SPEED_VALUE = 0;
 const MIN_TUNE_AUDIO_SPEED_VALUE = -10;
 const MAX_TUNE_AUDIO_SPEED_VALUE = 2;
 const DEFAULT_TUNE_AUDIO_MILLISECONDS_PER_MEASURE = 1000;
+const TUNE_AUDIO_PLAYBACK_START_DELAY_MS = 50;
+const TUNE_AUDIO_SOUNDFONT_KIT = "MusyngKite";
+const TUNE_AUDIO_UNAVAILABLE_OPTION_SUFFIX = " (Unavailable)";
 const TUNE_AUDIO_INSTRUMENT_OPTIONS = [
-  { program: 21, label: "Accordion" },
-  { program: 22, label: "Harmonica" },
-  { program: 24, label: "Guitar (Nylon)" },
-  { program: 25, label: "Guitar (Steel)" },
-  { program: 46, label: "Harp" },
-  { program: 73, label: "Irish Flute" },
-  { program: 78, label: "Tin Whistle" },
-  { program: 105, label: "Banjo" },
-  { program: 109, label: "Uilleann Pipes" },
-  { program: 110, label: "Fiddle" },
+  { program: 22, label: "Accordion", smplrInstrumentName: "accordion" },
+  { program: 25, label: "Acoustic Guitar (nylon)", smplrInstrumentName: "acoustic_guitar_nylon" },
+  { program: 26, label: "Acoustic Guitar (steel)", smplrInstrumentName: "acoustic_guitar_steel" },
+  { program: 110, label: "Bagpipe", smplrInstrumentName: "bagpipe" },
+  { program: 106, label: "Banjo", smplrInstrumentName: "banjo" },
+  { program: 16, label: "Dulcimer", smplrInstrumentName: "dulcimer" },
+  { program: 111, label: "Fiddle", smplrInstrumentName: "fiddle" },
+  { program: 74, label: "Flute", smplrInstrumentName: "flute" },
+  { program: 23, label: "Harmonica", smplrInstrumentName: "harmonica" },
+  { program: 47, label: "Harp", smplrInstrumentName: "orchestral_harp" },
+  { program: 41, label: "Violin", smplrInstrumentName: "violin" },
+  { program: 79, label: "Whistle", smplrInstrumentName: "whistle" },
 ];
-const DEFAULT_TUNE_AUDIO_INSTRUMENT_PROGRAM = TUNE_AUDIO_INSTRUMENT_OPTIONS[0].program;
-const TUNE_AUDIO_METADATA_BY_TYPE = new Map([
-  ["barndance", { meter: "4/4", noteLength: "1/8" }],
-  ["hornpipe", { meter: "4/4", noteLength: "1/8" }],
-  ["jig", { meter: "6/8", noteLength: "1/8" }],
-  ["march", { meter: "4/4", noteLength: "1/8" }],
-  ["mazurka", { meter: "3/4", noteLength: "1/8" }],
-  ["polka", { meter: "2/4", noteLength: "1/8" }],
-  ["reel", { meter: "4/4", noteLength: "1/8" }],
-  ["slide", { meter: "12/8", noteLength: "1/8" }],
-  ["slip jig", { meter: "9/8", noteLength: "1/8" }],
-  ["strathspey", { meter: "4/4", noteLength: "1/8" }],
-  ["three two", { meter: "3/2", noteLength: "1/8" }],
-  ["waltz", { meter: "3/4", noteLength: "1/8" }],
-]);
+
+const DEFAULT_TUNE_AUDIO_INSTRUMENT_PROGRAM = 47; // Harp remains the default
 
 let abcjsScriptPromise = null;
+let smplrModulePromise = null;
 
-function getTheSessionTuneJsonUrl(tuneId) {
-  return `${getTheSessionTuneUrl(tuneId)}?format=json`;
-}
+function normalizeTheSessionTuneAudioAbc(abcText) {
+  const rawAbcText = String(abcText || "").trim();
+  if (!rawAbcText) {
+    return "";
+  }
 
-function normalizeTuneTypeForAudio(type) {
-  return String(type || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
+  let normalizedAbcText = "";
+  let inQuote = false;
+
+  for (let index = 0; index < rawAbcText.length; index += 1) {
+    const currentCharacter = rawAbcText[index];
+
+    if (currentCharacter === '"') {
+      inQuote = !inQuote;
+      normalizedAbcText += currentCharacter;
+      continue;
+    }
+
+    if (currentCharacter !== "!" || inQuote) {
+      normalizedAbcText += currentCharacter;
+      continue;
+    }
+
+    let decorationEndIndex = index + 1;
+    while (
+      decorationEndIndex < rawAbcText.length &&
+      rawAbcText[decorationEndIndex] !== "!" &&
+      !/[\r\n\t ]/.test(rawAbcText[decorationEndIndex])
+    ) {
+      decorationEndIndex += 1;
+    }
+
+    if (
+      decorationEndIndex < rawAbcText.length &&
+      rawAbcText[decorationEndIndex] === "!" &&
+      decorationEndIndex > index + 1
+    ) {
+      normalizedAbcText += rawAbcText.slice(index, decorationEndIndex + 1);
+      index = decorationEndIndex;
+      continue;
+    }
+
+    normalizedAbcText += "\n";
+    while (index + 1 < rawAbcText.length && /[\r\n\t ]/.test(rawAbcText[index + 1])) {
+      index += 1;
+    }
+  }
+
+  return normalizedAbcText.replace(/\n{2,}/g, "\n");
 }
 
 function normalizeTuneAudioInstrumentProgram(value) {
@@ -75,106 +109,104 @@ function normalizeTuneAudioInstrumentProgram(value) {
     : DEFAULT_TUNE_AUDIO_INSTRUMENT_PROGRAM;
 }
 
+function getTuneAudioInstrumentOption(program) {
+  const normalizedProgram = normalizeTuneAudioInstrumentProgram(program);
+
+  return (
+    TUNE_AUDIO_INSTRUMENT_OPTIONS.find((option) => option.program === normalizedProgram) ||
+    TUNE_AUDIO_INSTRUMENT_OPTIONS[0]
+  );
+}
+
+function isTuneAudioInstrumentAvailable(program) {
+  return Boolean(getTuneAudioInstrumentOption(program)?.smplrInstrumentName);
+}
+
+function getTuneAudioInstrumentUnavailableMessage(program) {
+  const option = getTuneAudioInstrumentOption(program);
+  if (option?.smplrInstrumentName) {
+    return "";
+  }
+
+  return `${option?.label || "This instrument"} isn't available in this playback engine.`;
+}
+
 function renderTuneAudioInstrumentOptions(selectedProgram) {
   const resolvedProgram = normalizeTuneAudioInstrumentProgram(selectedProgram);
 
   return TUNE_AUDIO_INSTRUMENT_OPTIONS.map(
     (option) => `
-      <option value="${option.program}" ${option.program === resolvedProgram ? "selected" : ""}>
-        ${escapeHtml(option.label)}
+      <option
+        value="${option.program}"
+        ${option.program === resolvedProgram ? "selected" : ""}
+        ${option.smplrInstrumentName ? "" : "disabled"}
+      >
+        ${escapeHtml(
+          option.smplrInstrumentName
+            ? option.label
+            : `${option.label}${TUNE_AUDIO_UNAVAILABLE_OPTION_SUFFIX}`,
+        )}
       </option>
     `,
   ).join("");
 }
 
-function getTuneAudioMetadata(type) {
-  const normalizedType = normalizeTuneTypeForAudio(type);
-
-  return {
-    rhythm: normalizedType || "reel",
-    ...(TUNE_AUDIO_METADATA_BY_TYPE.get(normalizedType) || {
-      meter: "4/4",
-      noteLength: "1/8",
-    }),
-  };
+function getTuneAudioPlaybackUnitSeconds(millisecondsPerMeasure, meterSize) {
+  const resolvedMeterSize = Number.isFinite(meterSize) && meterSize > 0 ? meterSize : 1;
+  return millisecondsPerMeasure / 1000 / resolvedMeterSize;
 }
 
-function normalizeAbcKeySignature(rawKey) {
-  const normalizedKey = String(rawKey || "").trim();
-  if (!normalizedKey) {
-    return "C";
+function getTuneAudioPlaybackDurationMs(playbackSequence, millisecondsPerMeasure, meterSize) {
+  const totalDurationUnits =
+    Number.isFinite(playbackSequence?.totalDuration) && playbackSequence.totalDuration > 0
+      ? playbackSequence.totalDuration
+      : 0;
+
+  if (!(totalDurationUnits > 0)) {
+    return 0;
   }
 
-  return normalizedKey
-    .replace(/\s+/g, "")
-    .replace(/major/gi, "maj")
-    .replace(/minor/gi, "min")
-    .replace(/mixolydian/gi, "mix")
-    .replace(/dorian/gi, "dor")
-    .replace(/aeolian/gi, "aeo")
-    .replace(/ionian/gi, "ion")
-    .replace(/phrygian/gi, "phr")
-    .replace(/lydian/gi, "lyd")
-    .replace(/locrian/gi, "loc");
+  return Math.ceil(
+    totalDurationUnits * getTuneAudioPlaybackUnitSeconds(millisecondsPerMeasure, meterSize) * 1000,
+  );
 }
 
-function formatTheSessionKeyLabel(rawKey) {
-  const normalizedKey = String(rawKey || "").trim();
-  if (!normalizedKey) {
-    return "";
+function getTuneAudioMeterSize(parsedTune) {
+  const meter = parsedTune?.getMeterFraction?.() || {};
+  const numerator = Number(meter.num);
+  const denominator = Number(meter.den);
+
+  if (!(numerator > 0) || !(denominator > 0)) {
+    return 1;
   }
 
-  const keyMatch = normalizedKey.match(/^([A-Ga-g][b#]?)(.*)$/);
-  if (!keyMatch) {
-    return normalizedKey;
-  }
-
-  const tonic = keyMatch[1].charAt(0).toUpperCase() + keyMatch[1].slice(1);
-  const mode = keyMatch[2]
-    .replace(/([A-Z])/g, " $1")
-    .trim()
-    .toLowerCase();
-
-  return mode ? `${tonic} ${mode}` : tonic;
+  return numerator / denominator;
 }
 
-function buildTheSessionTuneAudioAbc(tune, setting) {
-  const abcBody = String(setting?.abc || "").trim();
-  if (!abcBody) {
-    return "";
+
+function normalizeTuneAudioSpeedValue(value) {
+  const parsedValue = Number.parseInt(String(value ?? DEFAULT_TUNE_AUDIO_SPEED_VALUE), 10);
+  if (!Number.isFinite(parsedValue)) {
+    return DEFAULT_TUNE_AUDIO_SPEED_VALUE;
   }
 
-  if (/^\s*X:/m.test(abcBody) && /^\s*K:/m.test(abcBody)) {
-    return abcBody;
-  }
-
-  const tuneAudioMetadata = getTuneAudioMetadata(tune?.type);
-  const abcLines = [
-    "X: 1",
-    `T: ${String(tune?.primaryName || "Untitled tune").trim()}`,
-  ];
-
-  if (setting?.member?.name) {
-    abcLines.push(`Z: ${String(setting.member.name).trim()}`);
-  }
-
-  if (setting?.url) {
-    abcLines.push(`S: ${String(setting.url).trim()}`);
-  }
-
-  if (tuneAudioMetadata.rhythm) {
-    abcLines.push(`R: ${tuneAudioMetadata.rhythm}`);
-  }
-
-  abcLines.push(`M: ${tuneAudioMetadata.meter}`);
-  abcLines.push(`L: ${tuneAudioMetadata.noteLength}`);
-  abcLines.push(`K: ${normalizeAbcKeySignature(setting?.key)}`);
-  abcLines.push(abcBody);
-
-  return abcLines.join("\n");
+  return Math.min(
+    MAX_TUNE_AUDIO_SPEED_VALUE,
+    Math.max(MIN_TUNE_AUDIO_SPEED_VALUE, parsedValue),
+  );
 }
 
-function getTuneAudioBaseMillisecondsPerMeasure(abcText) {
+function getTuneAudioMillisecondsPerMeasure(baseMillisecondsPerMeasure, speedValue) {
+  const resolvedBaseMillisecondsPerMeasure =
+    Number.isFinite(baseMillisecondsPerMeasure) && baseMillisecondsPerMeasure > 0
+      ? baseMillisecondsPerMeasure
+      : DEFAULT_TUNE_AUDIO_MILLISECONDS_PER_MEASURE;
+  const resolvedSpeedValue = normalizeTuneAudioSpeedValue(speedValue);
+
+  return resolvedBaseMillisecondsPerMeasure - (resolvedSpeedValue * resolvedBaseMillisecondsPerMeasure) / 6;
+}
+
+function getTheSessionDefaultTuneAudioMillisecondsPerMeasure(abcText) {
   const normalizedAbcText = String(abcText || "");
 
   if (normalizedAbcText.includes("M: 3/2")) {
@@ -198,28 +230,6 @@ function getTuneAudioBaseMillisecondsPerMeasure(abcText) {
   }
 
   return DEFAULT_TUNE_AUDIO_MILLISECONDS_PER_MEASURE;
-}
-
-function normalizeTuneAudioSpeedValue(value) {
-  const parsedValue = Number.parseInt(String(value ?? DEFAULT_TUNE_AUDIO_SPEED_VALUE), 10);
-  if (!Number.isFinite(parsedValue)) {
-    return DEFAULT_TUNE_AUDIO_SPEED_VALUE;
-  }
-
-  return Math.min(
-    MAX_TUNE_AUDIO_SPEED_VALUE,
-    Math.max(MIN_TUNE_AUDIO_SPEED_VALUE, parsedValue),
-  );
-}
-
-function getTuneAudioMillisecondsPerMeasure(baseMillisecondsPerMeasure, speedValue) {
-  const resolvedBaseMillisecondsPerMeasure =
-    Number.isFinite(baseMillisecondsPerMeasure) && baseMillisecondsPerMeasure > 0
-      ? baseMillisecondsPerMeasure
-      : DEFAULT_TUNE_AUDIO_MILLISECONDS_PER_MEASURE;
-  const resolvedSpeedValue = normalizeTuneAudioSpeedValue(speedValue);
-
-  return resolvedBaseMillisecondsPerMeasure - (resolvedSpeedValue * resolvedBaseMillisecondsPerMeasure) / 6;
 }
 
 function formatTuneAudioSpeedLabel(speedValue) {
@@ -303,8 +313,16 @@ function renderTuneAudioCard(selectedTune, audioState) {
   const resolvedInstrumentProgram = normalizeTuneAudioInstrumentProgram(
     resolvedAudioState.instrumentProgram,
   );
-  const statusClassName =
-    resolvedAudioState.status === "error" ? " tune-audio__status--error" : "";
+  const instrumentUnavailableMessage = isTuneAudioInstrumentAvailable(resolvedInstrumentProgram)
+    ? ""
+    : getTuneAudioInstrumentUnavailableMessage(resolvedInstrumentProgram);
+  const statusMessage =
+    resolvedAudioState.status === "error"
+      ? resolvedAudioState.message
+      : instrumentUnavailableMessage;
+  const statusClassName = statusMessage ? " tune-audio__status--error" : "";
+  const isPlayDisabled =
+    resolvedAudioState.status === "loading" || Boolean(instrumentUnavailableMessage);
 
   return `
     <section
@@ -332,7 +350,7 @@ function renderTuneAudioCard(selectedTune, audioState) {
               type="button"
               data-action="play-tune-audio"
               data-tune-id="${escapeHtml(tuneId)}"
-              ${resolvedAudioState.status === "loading" ? "disabled" : ""}
+              ${isPlayDisabled ? "disabled" : ""}
             >
               ${renderTuneAudioButtonContent(resolvedAudioState)}
             </button>
@@ -363,7 +381,7 @@ function renderTuneAudioCard(selectedTune, audioState) {
           </div>
         </div>
         <p class="tune-audio__copy">
-          This plays just the first setting. For more settings and notation,
+          This plays the most popular cached setting. For more settings and notation,
           <a
             class="metadata-link"
             href="${escapeHtml(getTheSessionTuneUrl(tuneId))}"
@@ -372,10 +390,10 @@ function renderTuneAudioCard(selectedTune, audioState) {
           >view this tune on The Session</a>.
         </p>
         ${
-          resolvedAudioState.status === "error"
+          statusMessage
             ? `
               <p class="tune-audio__status${statusClassName}">
-                ${escapeHtml(resolvedAudioState.message)}
+                ${escapeHtml(statusMessage)}
               </p>
             `
             : ""
@@ -434,11 +452,21 @@ function loadAbcjsLibrary() {
   return abcjsScriptPromise;
 }
 
-function createTuneAudioScratchHost() {
-  const scratchHost = document.createElement("div");
-  scratchHost.className = "tune-audio__scratch";
-  document.body.append(scratchHost);
-  return scratchHost;
+async function loadSmplrLibrary() {
+  if (smplrModulePromise) {
+    return smplrModulePromise;
+  }
+
+  smplrModulePromise = import(SMPLR_MODULE_URL).catch((error) => {
+    smplrModulePromise = null;
+    throw new Error(
+      error instanceof Error && error.message
+        ? error.message
+        : "Couldn't load the sampled instrument library.",
+    );
+  });
+
+  return smplrModulePromise;
 }
 
 function renderMetadataPart(part) {
@@ -1046,13 +1074,14 @@ export function createUIController({ elements, actions, charts }) {
   let tuneAudioState = createTuneAudioState();
   let tuneAudioRequestId = 0;
   let tuneAudioEndTimeout = null;
-  let tuneAudioSynth = null;
+  let tuneAudioPlayer = null;
   let tuneAudioContext = null;
+  let tuneAudioSampleLoader = null;
   let tuneAudioPlaybackDurationMs = 0;
   let tuneAudioPlaybackPositionMs = 0;
   let tuneAudioPlaybackRemainingMs = 0;
   let tuneAudioPlaybackTimerStartedAt = 0;
-  const tuneAudioDataCache = new Map();
+  const tuneAudioInstrumentPromises = new Map();
   const listSnapshots = {
     places: { scrollTop: 0 },
     tunes: { scrollTop: 0 },
@@ -1312,8 +1341,14 @@ export function createUIController({ elements, actions, charts }) {
       : currentPositionMs;
   }
 
-  function getTuneAudioSpeedValue() {
-    return normalizeTuneAudioSpeedValue(tuneAudioState?.speedValue);
+  function getTuneAudioSpeedValue(tuneId = null) {
+    const normalizedTuneId = String(tuneId || "");
+    const resolvedSpeedValue =
+      normalizedTuneId && tuneAudioState?.tuneId !== normalizedTuneId
+        ? DEFAULT_TUNE_AUDIO_SPEED_VALUE
+        : tuneAudioState?.speedValue;
+
+    return normalizeTuneAudioSpeedValue(resolvedSpeedValue);
   }
 
   function getTuneAudioInstrumentProgram() {
@@ -1322,7 +1357,7 @@ export function createUIController({ elements, actions, charts }) {
 
   function createNextTuneAudioState(tuneId, overrides = {}) {
     return createTuneAudioState(tuneId, {
-      speedValue: getTuneAudioSpeedValue(),
+      speedValue: getTuneAudioSpeedValue(tuneId),
       instrumentProgram: getTuneAudioInstrumentProgram(),
       ...overrides,
     });
@@ -1333,53 +1368,61 @@ export function createUIController({ elements, actions, charts }) {
       status: "ready",
       settingKey,
       message: settingKey
-        ? `The first The Session setting in ${settingKey} is ready to replay.`
-        : "The first The Session setting is ready to replay.",
+        ? `The most popular cached setting in ${settingKey} is ready to replay.`
+        : "The most popular cached setting is ready to replay.",
     });
   }
 
-  function completeTuneAudioPlayback(requestId, tuneId, synth, settingKey) {
+  function completeTuneAudioPlayback(requestId, tuneId, player, settingKey) {
     if (
       requestId !== tuneAudioRequestId ||
-      tuneAudioSynth !== synth ||
+      tuneAudioPlayer !== player ||
       !isTuneDetailVisible(tuneId)
     ) {
       return;
     }
 
-    tuneAudioSynth = null;
+    tuneAudioPlayer = null;
     clearTuneAudioEndTimeout();
     resetTuneAudioPlaybackTiming();
     setTuneAudioReadyState(tuneId, settingKey);
     renderTuneAudioCardIfPresent();
   }
 
-  function scheduleTuneAudioEndTimeout(requestId, tuneId, synth, settingKey) {
+  function scheduleTuneAudioEndTimeout(
+    requestId,
+    tuneId,
+    player,
+    settingKey,
+    startDelayMs = 0,
+  ) {
     clearTuneAudioEndTimeout();
 
     if (!(tuneAudioPlaybackRemainingMs > 0)) {
       return;
     }
 
-    tuneAudioPlaybackTimerStartedAt = Date.now();
+    const normalizedStartDelayMs =
+      Number.isFinite(startDelayMs) && startDelayMs > 0 ? startDelayMs : 0;
+    tuneAudioPlaybackTimerStartedAt = Date.now() + normalizedStartDelayMs;
     tuneAudioEndTimeout = window.setTimeout(() => {
-      completeTuneAudioPlayback(requestId, tuneId, synth, settingKey);
-    }, tuneAudioPlaybackRemainingMs);
+      completeTuneAudioPlayback(requestId, tuneId, player, settingKey);
+    }, tuneAudioPlaybackRemainingMs + normalizedStartDelayMs);
   }
 
   function stopTuneAudioPlayback(options = {}) {
     const { preserveTiming = false } = options;
     clearTuneAudioEndTimeout();
 
-    if (tuneAudioSynth && typeof tuneAudioSynth.stop === "function") {
+    if (tuneAudioPlayer && typeof tuneAudioPlayer.stop === "function") {
       try {
-        tuneAudioSynth.stop();
+        tuneAudioPlayer.stop();
       } catch (error) {
         console.warn("Unable to stop tune audio cleanly.", error);
       }
     }
 
-    tuneAudioSynth = null;
+    tuneAudioPlayer = null;
     if (!preserveTiming) {
       resetTuneAudioPlaybackTiming();
     }
@@ -1416,7 +1459,7 @@ export function createUIController({ elements, actions, charts }) {
   async function ensureTuneAudioContext() {
     const AudioContextConstructor = getAudioContextConstructor();
     if (!AudioContextConstructor) {
-      throw new Error("This browser can't play synthesized tune audio.");
+      throw new Error("This browser can't play sampled tune audio.");
     }
 
     if (!tuneAudioContext) {
@@ -1433,58 +1476,158 @@ export function createUIController({ elements, actions, charts }) {
     return tuneAudioContext;
   }
 
+  async function ensureTuneAudioInstrument(audioContext, Smplr, instrumentProgram) {
+    const instrumentOption = getTuneAudioInstrumentOption(instrumentProgram);
+    if (!instrumentOption?.smplrInstrumentName) {
+      throw new Error(getTuneAudioInstrumentUnavailableMessage(instrumentProgram));
+    }
+
+    if (!tuneAudioSampleLoader) {
+      const sampleLoaderOptions =
+        window.isSecureContext &&
+        window.caches &&
+        typeof Smplr.CacheStorage === "function"
+          ? { storage: new Smplr.CacheStorage("irish-trad-music-soundfonts") }
+          : undefined;
+      tuneAudioSampleLoader = new Smplr.SampleLoader(audioContext, sampleLoaderOptions);
+    }
+
+    const instrumentCacheKey = `${instrumentOption.smplrInstrumentName}:${TUNE_AUDIO_SOUNDFONT_KIT}`;
+    if (tuneAudioInstrumentPromises.has(instrumentCacheKey)) {
+      return tuneAudioInstrumentPromises.get(instrumentCacheKey);
+    }
+
+    const instrumentPromise = new Smplr.Soundfont(audioContext, {
+      instrument: instrumentOption.smplrInstrumentName,
+      kit: TUNE_AUDIO_SOUNDFONT_KIT,
+      loader: tuneAudioSampleLoader,
+    }).load.catch((error) => {
+      tuneAudioInstrumentPromises.delete(instrumentCacheKey);
+      throw new Error(
+        error instanceof Error && error.message
+          ? error.message
+          : `Couldn't load ${instrumentOption.label} for playback.`,
+      );
+    });
+
+    tuneAudioInstrumentPromises.set(instrumentCacheKey, instrumentPromise);
+    return instrumentPromise;
+  }
+
+  function createTuneAudioPlayer({
+    audioContext,
+    instrument,
+    playbackSequence,
+    millisecondsPerMeasure,
+    meterSize,
+    startOffsetMs,
+  }) {
+    const playbackDurationMs = getTuneAudioPlaybackDurationMs(
+      playbackSequence,
+      millisecondsPerMeasure,
+      meterSize,
+    );
+    const seekOffsetMs =
+      playbackDurationMs > 0
+        ? Math.min(startOffsetMs, Math.max(playbackDurationMs - 1, 0))
+        : startOffsetMs;
+    const playbackUnitSeconds = getTuneAudioPlaybackUnitSeconds(
+      millisecondsPerMeasure,
+      meterSize,
+    );
+    const playbackStartTime =
+      audioContext.currentTime + TUNE_AUDIO_PLAYBACK_START_DELAY_MS / 1000;
+    const stopFns = [];
+
+    playbackSequence.tracks.forEach((track, trackIndex) => {
+      if (!Array.isArray(track)) {
+        return;
+      }
+
+      track.forEach((event, eventIndex) => {
+        if (
+          event?.cmd !== "note" ||
+          !Number.isFinite(event.pitch) ||
+          !Number.isFinite(event.start) ||
+          !Number.isFinite(event.duration)
+        ) {
+          return;
+        }
+
+        const eventStartSeconds = event.start * playbackUnitSeconds;
+        const eventEndSeconds = (event.start + event.duration) * playbackUnitSeconds;
+        if (eventEndSeconds <= seekOffsetMs / 1000) {
+          return;
+        }
+
+        const eventPlaybackTime =
+          playbackStartTime + Math.max(0, eventStartSeconds - seekOffsetMs / 1000);
+        const truncatedDurationSeconds =
+          eventEndSeconds - Math.max(eventStartSeconds, seekOffsetMs / 1000);
+        if (!(truncatedDurationSeconds > 0)) {
+          return;
+        }
+
+        stopFns.push(
+          instrument.start({
+            note: event.pitch,
+            velocity:
+              Number.isFinite(event.volume) && event.volume > 0
+                ? Math.min(127, Math.max(1, event.volume))
+                : 100,
+            detune: Number.isFinite(event.cents) ? event.cents : 0,
+            duration: truncatedDurationSeconds,
+            time: eventPlaybackTime,
+            stopId: `track-${trackIndex}-event-${eventIndex}`,
+          }),
+        );
+      });
+    });
+
+    return {
+      playbackDurationMs,
+      seekOffsetMs,
+      startDelayMs: TUNE_AUDIO_PLAYBACK_START_DELAY_MS,
+      stop() {
+        const stopAtTime = audioContext.currentTime;
+        stopFns.forEach((stop) => {
+          try {
+            stop(stopAtTime);
+          } catch (error) {
+            console.warn("Unable to stop a scheduled tune note cleanly.", error);
+          }
+        });
+
+        if (typeof instrument.stop === "function") {
+          instrument.stop({ time: stopAtTime });
+        }
+      },
+    };
+  }
+
   async function fetchTuneAudioData(selectedTune) {
     const tuneId = String(selectedTune?.id || "");
     if (!tuneId) {
-      throw new Error("This tune doesn't have a The Session id.");
+      throw new Error("This tune doesn't have a playable cached setting.");
     }
 
-    if (tuneAudioDataCache.has(tuneId)) {
-      return await tuneAudioDataCache.get(tuneId);
-    }
-
-    const pendingRequest = (async () => {
-      const response = await fetch(getTheSessionTuneJsonUrl(tuneId));
-      if (!response.ok) {
-        throw new Error("Couldn't load this tune from The Session.");
-      }
-
-      const tunePayload = await response.json();
-      const firstSetting = Array.isArray(tunePayload.settings)
-        ? tunePayload.settings.find(
-            (setting) => typeof setting?.abc === "string" && setting.abc.trim(),
-          )
-        : null;
-
-      if (!firstSetting) {
-        throw new Error("The Session doesn't list a playable setting for this tune.");
-      }
-
-      const abcText = buildTheSessionTuneAudioAbc(
-        {
-          primaryName: tunePayload.name || selectedTune.primaryName,
-          type: tunePayload.type || selectedTune.type,
-        },
-        firstSetting,
-      );
+    const tuneAudioData = selectedTune?.audioPlayback;
+    if (
+      tuneAudioData &&
+      typeof tuneAudioData.abcText === "string" &&
+      tuneAudioData.abcText.trim()
+    ) {
+      const normalizedAbcText = normalizeTheSessionTuneAudioAbc(tuneAudioData.abcText);
 
       return {
-        abcText,
-        settingKey: formatTheSessionKeyLabel(firstSetting.key),
-        baseMillisecondsPerMeasure: getTuneAudioBaseMillisecondsPerMeasure(abcText),
+        abcText: normalizedAbcText,
+        settingKey: String(tuneAudioData.settingKey || ""),
+        baseMillisecondsPerMeasure:
+          getTheSessionDefaultTuneAudioMillisecondsPerMeasure(normalizedAbcText),
       };
-    })();
-
-    tuneAudioDataCache.set(tuneId, pendingRequest);
-
-    try {
-      const resolvedData = await pendingRequest;
-      tuneAudioDataCache.set(tuneId, resolvedData);
-      return resolvedData;
-    } catch (error) {
-      tuneAudioDataCache.delete(tuneId);
-      throw error;
     }
+
+    throw new Error("No cached tune setting is available for playback.");
   }
 
   async function playTuneAudio(tuneId, startOffsetMs = 0) {
@@ -1504,15 +1647,16 @@ export function createUIController({ elements, actions, charts }) {
       status: "loading",
       message:
         normalizedStartOffsetMs > 0
-          ? "Resuming the first The Session setting..."
-          : "Loading the first The Session setting...",
+          ? "Resuming the most popular cached setting..."
+          : "Loading the most popular cached setting...",
     });
     renderTuneAudioCardIfPresent();
 
     try {
-      const [audioContext, ABCJS, tuneAudioData] = await Promise.all([
+      const [audioContext, ABCJS, Smplr, tuneAudioData] = await Promise.all([
         audioContextPromise,
         loadAbcjsLibrary(),
+        loadSmplrLibrary(),
         fetchTuneAudioData(selectedTune),
       ]);
 
@@ -1520,87 +1664,79 @@ export function createUIController({ elements, actions, charts }) {
         return;
       }
 
-      if (!ABCJS?.synth?.supportsAudio || !ABCJS.synth.supportsAudio()) {
-        throw new Error("This browser can't synthesize tune audio.");
-      }
-
-      const scratchHost = createTuneAudioScratchHost();
-      let visualObject = null;
-
-      try {
-        visualObject = ABCJS.renderAbc(scratchHost, tuneAudioData.abcText)?.[0] || null;
-      } finally {
-        scratchHost.remove();
-      }
-
-      if (!visualObject) {
-        throw new Error("Couldn't prepare the first The Session setting for playback.");
+      const parsedTune = ABCJS.parseOnly(tuneAudioData.abcText)?.[0] || null;
+      if (!parsedTune) {
+        throw new Error("Couldn't prepare the cached setting for playback.");
       }
 
       const millisecondsPerMeasure = getTuneAudioMillisecondsPerMeasure(
         tuneAudioData.baseMillisecondsPerMeasure,
         getTuneAudioSpeedValue(),
       );
-      const synth = new ABCJS.synth.CreateSynth();
-      tuneAudioSynth = synth;
+      const playbackSequence = parsedTune.setUpAudio({ program: instrumentProgram });
+      const meterSize = getTuneAudioMeterSize(parsedTune);
 
-      const primeResult = await synth
-        .init({
-          audioContext,
-          visualObj: visualObject,
-          millisecondsPerMeasure,
-          options: {
-            program: instrumentProgram,
-            onEnded() {
-              completeTuneAudioPlayback(
-                requestId,
-                tuneId,
-                synth,
-                tuneAudioData.settingKey,
-              );
-            },
-          },
-        })
-        .then(() => synth.prime());
+      if (
+        !playbackSequence ||
+        !Array.isArray(playbackSequence.tracks) ||
+        playbackSequence.tracks.length === 0
+      ) {
+        throw new Error("Couldn't build the cached setting for playback.");
+      }
+
+      const instrument = await ensureTuneAudioInstrument(
+        audioContext,
+        Smplr,
+        instrumentProgram,
+      );
 
       if (
         requestId !== tuneAudioRequestId ||
-        tuneAudioSynth !== synth ||
         !isTuneDetailVisible(tuneId)
       ) {
-        if (typeof synth.stop === "function") {
-          synth.stop();
-        }
         return;
       }
 
-      const playbackDurationMs =
-        primeResult && Number.isFinite(primeResult.duration) && primeResult.duration > 0
-          ? Math.ceil(primeResult.duration * 1000)
-          : 0;
-      const seekOffsetMs =
-        playbackDurationMs > 0
-          ? Math.min(normalizedStartOffsetMs, Math.max(playbackDurationMs - 1, 0))
-          : normalizedStartOffsetMs;
+      const player = createTuneAudioPlayer({
+        audioContext,
+        instrument,
+        playbackSequence,
+        millisecondsPerMeasure,
+        meterSize,
+        startOffsetMs: normalizedStartOffsetMs,
+      });
 
-      if (seekOffsetMs > 0 && typeof synth.seek === "function") {
-        synth.seek(seekOffsetMs / 1000, "seconds");
+      if (!(player.playbackDurationMs > 0)) {
+        throw new Error("Couldn't build the cached setting for playback.");
       }
 
-      synth.start();
-      tuneAudioPlaybackDurationMs = playbackDurationMs;
-      tuneAudioPlaybackPositionMs = seekOffsetMs;
+      if (requestId !== tuneAudioRequestId || !isTuneDetailVisible(tuneId)) {
+        player.stop();
+        return;
+      }
+
+      tuneAudioPlayer = player;
+      tuneAudioPlaybackDurationMs = player.playbackDurationMs;
+      tuneAudioPlaybackPositionMs = player.seekOffsetMs;
       tuneAudioPlaybackRemainingMs =
-        playbackDurationMs > 0 ? Math.max(0, playbackDurationMs - seekOffsetMs) : 0;
+        player.playbackDurationMs > 0
+          ? Math.max(0, player.playbackDurationMs - player.seekOffsetMs)
+          : 0;
       tuneAudioState = createNextTuneAudioState(tuneId, {
         status: "playing",
         settingKey: tuneAudioData.settingKey,
         message: tuneAudioData.settingKey
-          ? `Playing the first The Session setting in ${tuneAudioData.settingKey}.`
-          : "Playing the first The Session setting.",
+          ? `Playing the most popular cached setting in ${tuneAudioData.settingKey}.`
+          : "Playing the most popular cached setting.",
       });
       renderTuneAudioCardIfPresent();
-      scheduleTuneAudioEndTimeout(requestId, tuneId, synth, tuneAudioData.settingKey);
+      scheduleTuneAudioEndTimeout(
+        requestId,
+        tuneId,
+        player,
+        tuneAudioData.settingKey,
+        player.startDelayMs,
+      );
     } catch (error) {
       if (requestId !== tuneAudioRequestId || !isTuneDetailVisible(tuneId)) {
         return;
@@ -1621,7 +1757,7 @@ export function createUIController({ elements, actions, charts }) {
     if (
       tuneAudioState.status !== "playing" ||
       tuneAudioState.tuneId !== String(tuneId || "") ||
-      !tuneAudioSynth
+      !tuneAudioPlayer
     ) {
       return;
     }
@@ -1636,8 +1772,8 @@ export function createUIController({ elements, actions, charts }) {
       status: "paused",
       settingKey: tuneAudioState.settingKey,
       message: tuneAudioState.settingKey
-        ? `Paused the first The Session setting in ${tuneAudioState.settingKey}.`
-        : "Paused the first The Session setting.",
+        ? `Paused the most popular cached setting in ${tuneAudioState.settingKey}.`
+        : "Paused the most popular cached setting.",
     });
     renderTuneAudioCardIfPresent();
   }
@@ -1923,7 +2059,7 @@ export function createUIController({ elements, actions, charts }) {
       latestState = state;
 
       if (state.activeTab !== "tunes" || !selectedTune) {
-        if (tuneAudioState.tuneId !== null || tuneAudioSynth) {
+        if (tuneAudioState.tuneId !== null || tuneAudioPlayer) {
           resetTuneAudioState();
         }
       } else if (tuneAudioState.tuneId !== String(selectedTune.id)) {
@@ -2031,7 +2167,7 @@ export function createUIController({ elements, actions, charts }) {
           if (!restoredPlacesList && shouldScrollSidebarToTop) {
             elements.sidebarContent.scrollTop = 0;
           }
-        } else if (!restoredPlaceView && shouldScrollSidebarToTop) {
+        } else if (!restedPlaceView && shouldScrollSidebarToTop) {
           elements.sidebarContent.scrollTop = 0;
         }
         return;
@@ -2048,10 +2184,10 @@ export function createUIController({ elements, actions, charts }) {
       const restoredTuneView = restorePendingViewSnapshot(getSidebarViewKey(state));
       if (!selectedTune) {
         const restoredTunesList = restoredTuneView || restorePendingListSnapshot("tunes");
-        if (!restoredTunesList && shouldScrollSidebarToTop) {
+        if (!restedTunesList && shouldScrollSidebarToTop) {
           elements.sidebarContent.scrollTop = 0;
         }
-      } else if (!restoredTuneView && shouldScrollSidebarToTop) {
+      } else if (!restedTuneView && shouldScrollSidebarToTop) {
         elements.sidebarContent.scrollTop = 0;
       }
     },

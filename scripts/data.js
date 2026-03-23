@@ -296,6 +296,20 @@ async function fetchJson(fileName) {
   return response.json();
 }
 
+async function fetchOptionalJson(fileName, fallbackValue) {
+  const response = await fetch(new URL(fileName, DATA_ROOT));
+
+  if (response.status === 404) {
+    return fallbackValue;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Unable to load ${fileName}`);
+  }
+
+  return response.json();
+}
+
 function sortByPlaceName(left, right) {
   const primary = left.name.localeCompare(right.name, "en");
   if (primary !== 0) {
@@ -373,10 +387,11 @@ function buildTopPlacesChart(places) {
 }
 
 export async function loadAtlasData() {
-  const [placesGeoJson, linkedPlacesGeoJson, tunes] = await Promise.all([
+  const [placesGeoJson, linkedPlacesGeoJson, tunes, tuneAudioById] = await Promise.all([
     fetchJson("places.geojson"),
     fetchJson("tunesByPlaces.geojson"),
     fetchJson("tunes.json"),
+    fetchOptionalJson("tuneAudioById.json", {}),
   ]);
 
   const tuneById = new Map();
@@ -515,6 +530,7 @@ export async function loadAtlasData() {
       relatedPlaces: sortedRelatedPlaceIds
         .map((placeId) => placesById.get(placeId))
         .filter(Boolean),
+      audioPlayback: tuneAudioById?.[String(tune.id)] || null,
       metadataPlaceholders: { ...tuneMetadataPlaceholders },
     };
 
