@@ -1,7 +1,10 @@
 import {
+  DISABLE_TERRAIN_ON_MOBILE,
+  ENABLE_MAPBOX_DIAGNOSTICS,
   MAPBOX_ACCESS_TOKEN,
   MAPBOX_STYLE,
   MAP_PADDING,
+  MOBILE_SAFE_PROJECTION,
   SIDEBAR_BREAKPOINT,
   hasMapboxToken,
 } from "./config.js";
@@ -1651,6 +1654,111 @@ function renderMapPlaceholder(container, title, message) {
   `;
 }
 
+function isIPhoneSafari() {
+  const userAgent = window.navigator?.userAgent || "";
+
+  return (
+    /iPhone/i.test(userAgent) &&
+    /Safari/i.test(userAgent) &&
+    !/(CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser|GSA)/i.test(userAgent)
+  );
+}
+
+function extractMapboxErrorMessage(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return typeof error === "string" ? error : "";
+}
+
+function getMapboxResourceUrl(event) {
+  return [
+    event?.url,
+    event?.resource?.url,
+    event?.tile?.request?.url,
+    event?.error?.url,
+  ].find((value) => typeof value === "string" && value.trim() !== "") || "";
+}
+
+function getTileCoordinate(event) {
+  const canonical = event?.tile?.tileID?.canonical;
+
+  if (
+    !canonical ||
+    !Number.isFinite(canonical.z) ||
+    !Number.isFinite(canonical.x) ||
+    !Number.isFinite(canonical.y)
+  ) {
+    return null;
+  }
+
+  return `${canonical.z}/${canonical.x}/${canonical.y}`;
+}
+
+function classifyMapboxFailure(event, resourceUrl, errorMessage) {
+  const sourceId = typeof event?.sourceId === "string" ? event.sourceId.toLowerCase() : "";
+  const combinedText = `${sourceId} ${resourceUrl} ${errorMessage}`.toLowerCase();
+
+  if (
+    sourceId === "composite" ||
+    combinedText.includes("mapbox-streets") ||
+    combinedText.includes("composite")
+  ) {
+    return "composite";
+  }
+
+  if (combinedText.includes("/fonts/v1/") || combinedText.includes("glyph")) {
+    return "glyphs";
+  }
+
+  if (combinedText.includes("/sprites/") || combinedText.includes("sprite")) {
+    return "sprites";
+  }
+
+  if (combinedText.includes("/styles/v1/") || combinedText.includes(" style")) {
+    return "style";
+  }
+
+  return "resource";
+}
+
+function getMapboxFailureLabel(classification) {
+  if (classification === "composite") {
+    return "Basemap composite source";
+  }
+
+  if (classification === "glyphs") {
+    return "Basemap glyphs";
+  }
+
+  if (classification === "sprites") {
+    return "Basemap sprites";
+  }
+
+  if (classification === "style") {
+    return "Map style";
+  }
+
+  return "Mapbox resource";
+}
+
+function logMapboxDiagnostic(level, message, details = null) {
+  if (!ENABLE_MAPBOX_DIAGNOSTICS) {
+    return;
+  }
+
+  const logger =
+    typeof console[level] === "function" ? console[level].bind(console) : console.log.bind(console);
+
+  if (details && Object.keys(details).length > 0) {
+    logger(`[Mapbox diagnostics] ${message}`, details);
+    return;
+  }
+
+  logger(`[Mapbox diagnostics] ${message}`);
+}
+
 function renderHoverPopup(place, mapMode = MAP_MODE_TOTAL) {
   if (!place) {
     return "";
@@ -2076,6 +2184,13 @@ export function createMapController({
   let currentLabelMode = LABEL_MODE_SYMBOL;
   let currentSymbolLabelAnchorSignature = "";
   let basemapLabelLayerIds = [];
+  const basemapDiagnostics = {
+    mobileSafeProfileLogged: false,
+    styleReadyLogged: false,
+    compositeSeenLogged: false,
+    compositeReadyLogged: false,
+    compositePendingCheckScheduled: false,
+  };
   let latestViewportPadding =
     typeof getViewportPadding === "function"
       ? getMapPadding(getViewportPadding())
@@ -2087,6 +2202,140 @@ export function createMapController({
   const ringMarkerPromises = new Map();
   const coneMarkerPromises = new Map();
   let attributionLinksObserver = null;
+
+  function shouldUseMobileSafeBasemapProfile() {
+    return currentIsNarrowViewport && isIPhoneSafari();
+  }
+
+  function getCurrentProjectionName() {
+    if (typeof map.getProjection !== "function") {
+      return null;
+    }
+
+    const projection = map.getProjection();
+    if (typeof projection === "string") {
+      return projection;
+    }
+
+    return projection && typeof projection.name === "string" ? projection.name : null;
+  }
+
+  function applyMobileSafeBasemapProfile() {
+    if (!shouldUseMobileSafeBasemapProfile()) {
+      return false;
+    }
+
+    let didChange = false;
+    const currentProjectionName = getCurrentProjectionName();
+
+    if (
+      typeof map.setProjection === "function" &&
+      MOBILE_SAFE_PROJECTION &&
+      currentProjectionName !== MOBILE_SAFE_PROJECTION
+    ) {
+      map.setProjection(MOBILE_SAFE_PROJECTION);
+      didChange = true;
+    }
+
+    if (
+      DISABLE_TERRAIN_ON_MOBILE &&
+      typeof map.getTerrain === "function" &&
+      typeof map.setTerrain === "function" &&
+      map.getTerrain()
+    ) {
+      map.setTerrain(null);
+      didChange = true;
+    }
+
+    if (!basemapDiagnostics.mobileSafeProfileLogged) {
+      basemapDiagnostics.mobileSafeProfileLogged = true;
+      logMapboxDiagnostic("info", "Applied the mobile-safe basemap profile.", {
+        projection: MOBILE_SAFE_PROJECTION,
+        terrainDisabled: Boolean(DISABLE_TERRAIN_ON_MOBILE),
+      });
+    }
+
+    return didChange;
+  }
+
+  function logStyleReadinessIfNeeded() {
+    if (basemapDiagnostics.styleReadyLogged || !map.isStyleLoaded()) {
+      return;
+    }
+
+    basemapDiagnostics.styleReadyLogged = true;
+    logMapboxDiagnostic("info", "The Mapbox style graph is ready.", {
+      hasCompositeSource: Boolean(map.getSource("composite")),
+      mobileSafeProfile: shouldUseMobileSafeBasemapProfile(),
+      projection: getCurrentProjectionName(),
+    });
+  }
+
+  function handleCompositeSourceData(event) {
+    if (!ENABLE_MAPBOX_DIAGNOSTICS || event?.sourceId !== "composite") {
+      return;
+    }
+
+    if (!basemapDiagnostics.compositeSeenLogged) {
+      basemapDiagnostics.compositeSeenLogged = true;
+      logMapboxDiagnostic("info", "Observed basemap composite source activity.", {
+        sourceDataType:
+          typeof event.sourceDataType === "string" ? event.sourceDataType : null,
+      });
+    }
+
+    if (event.isSourceLoaded && !basemapDiagnostics.compositeReadyLogged) {
+      basemapDiagnostics.compositeReadyLogged = true;
+      logMapboxDiagnostic("info", "Basemap composite source reported ready.", {
+        sourceDataType:
+          typeof event.sourceDataType === "string" ? event.sourceDataType : null,
+      });
+    }
+  }
+
+  function scheduleCompositeSourcePendingCheck() {
+    if (!ENABLE_MAPBOX_DIAGNOSTICS || basemapDiagnostics.compositePendingCheckScheduled) {
+      return;
+    }
+
+    basemapDiagnostics.compositePendingCheckScheduled = true;
+    window.setTimeout(() => {
+      if (basemapDiagnostics.compositeReadyLogged) {
+        return;
+      }
+
+      logMapboxDiagnostic("warn", "Basemap composite source has not reported ready shortly after load.", {
+        hasCompositeSource: Boolean(map.getSource("composite")),
+        mobileSafeProfile: shouldUseMobileSafeBasemapProfile(),
+        projection: getCurrentProjectionName(),
+      });
+    }, 4000);
+  }
+
+  function handleMapboxError(event) {
+    if (!ENABLE_MAPBOX_DIAGNOSTICS || !event?.error) {
+      return;
+    }
+
+    const errorMessage = extractMapboxErrorMessage(event.error);
+    const resourceUrl = getMapboxResourceUrl(event);
+    const classification = classifyMapboxFailure(event, resourceUrl, errorMessage);
+
+    logMapboxDiagnostic(
+      "error",
+      `${getMapboxFailureLabel(classification)} failed to load or render.`,
+      {
+        classification,
+        sourceId: typeof event.sourceId === "string" ? event.sourceId : null,
+        sourceDataType:
+          typeof event.sourceDataType === "string" ? event.sourceDataType : null,
+        resourceUrl: resourceUrl || null,
+        tile: getTileCoordinate(event),
+        errorMessage: errorMessage || null,
+        mobileSafeProfile: shouldUseMobileSafeBasemapProfile(),
+      },
+    );
+  }
 
   if (mobileLegendToggle) {
     mobileLegendToggle.setAttribute("aria-controls", legendElement.id);
@@ -3027,7 +3276,19 @@ export function createMapController({
     }
   }
 
+  map.on("error", handleMapboxError);
+  map.on("styledata", () => {
+    logStyleReadinessIfNeeded();
+  });
+  map.on("sourcedata", (event) => {
+    logStyleReadinessIfNeeded();
+    handleCompositeSourceData(event);
+  });
+
   map.on("load", async () => {
+    applyMobileSafeBasemapProfile();
+    logStyleReadinessIfNeeded();
+    scheduleCompositeSourcePendingCheck();
     basemapLabelLayerIds = getBasemapLabelLayerIds();
     suppressBasemapLabelIcons();
     observeAttributionLinks();
