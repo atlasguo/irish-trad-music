@@ -2167,7 +2167,7 @@ export function createUIController({ elements, actions, charts }) {
           if (!restoredPlacesList && shouldScrollSidebarToTop) {
             elements.sidebarContent.scrollTop = 0;
           }
-        } else if (!restedPlaceView && shouldScrollSidebarToTop) {
+        } else if (!restoredPlaceView && shouldScrollSidebarToTop) {
           elements.sidebarContent.scrollTop = 0;
         }
         return;
@@ -2184,10 +2184,10 @@ export function createUIController({ elements, actions, charts }) {
       const restoredTuneView = restorePendingViewSnapshot(getSidebarViewKey(state));
       if (!selectedTune) {
         const restoredTunesList = restoredTuneView || restorePendingListSnapshot("tunes");
-        if (!restedTunesList && shouldScrollSidebarToTop) {
+        if (!restoredTunesList && shouldScrollSidebarToTop) {
           elements.sidebarContent.scrollTop = 0;
         }
-      } else if (!restedTuneView && shouldScrollSidebarToTop) {
+      } else if (!restoredTuneView && shouldScrollSidebarToTop) {
         elements.sidebarContent.scrollTop = 0;
       }
     },
