@@ -1605,12 +1605,6 @@ export function createUIController({ elements, actions, charts }) {
     actions.toggleMobileSidebarPanel();
   });
 
-  if (elements.sidebarToggle) {
-    elements.sidebarToggle.addEventListener("click", () => {
-      actions.closeMobilePanel();
-    });
-  }
-
   elements.sidebarContent.addEventListener(
     "scroll",
     () => {
@@ -1771,10 +1765,6 @@ export function createUIController({ elements, actions, charts }) {
         mobileSidebarState.textContent = "Menu";
       } else {
         elements.mobileSidebarToggle.textContent = "Menu";
-      }
-
-      if (elements.sidebarToggle) {
-        elements.sidebarToggle.classList.toggle("is-hidden", !isNarrowViewport);
       }
 
       syncTabButtons(elements.sidebarTabs, visualActiveTab ?? state.activeTab);

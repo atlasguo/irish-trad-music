@@ -1923,12 +1923,6 @@ function renderLegendBodyMarkup(mapMode, categoryTotals = {}, sizeClassCounts = 
 
 function renderLegendMarkup(mapMode, categoryTotals = {}, sizeClassCounts = {}) {
   return `
-    <button
-      class="map-legend__backdrop"
-      type="button"
-      data-action="close-mobile-legend"
-      aria-label="Close map legend"
-    ></button>
     <section class="map-legend__panel" aria-label="Map legend">
       <div class="map-legend__content">
         ${renderLegendBodyMarkup(mapMode, categoryTotals, sizeClassCounts)}
@@ -2643,21 +2637,6 @@ export function createMapController({
 
   function handleLegendClick(event) {
     handleLayerControlsClick(event);
-
-    const actionElement = event.target.closest("[data-action]");
-    if (actionElement) {
-      const action = actionElement.dataset.action;
-
-      if (
-        action === "close-mobile-legend" &&
-        currentIsNarrowViewport &&
-        currentMobilePanel === "legend" &&
-        typeof onMobileLegendToggle === "function"
-      ) {
-        onMobileLegendToggle();
-        return;
-      }
-    }
 
     const modeButton = event.target.closest("[data-map-mode]");
     if (!modeButton) {

@@ -31,7 +31,6 @@ const elements = {
   mobileTopbar: document.getElementById("mobileTopbar"),
   sidebar: document.getElementById("sidebar"),
   sidebarTabs: document.getElementById("sidebarTabs"),
-  sidebarToggle: document.getElementById("sidebarToggle"),
   sidebarContent: document.getElementById("sidebarContent"),
   mobileSidebarToggle: document.getElementById("mobileSidebarToggle"),
   mobileLegendToggle: document.getElementById("mobileLegendToggle"),
