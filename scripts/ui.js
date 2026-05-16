@@ -300,11 +300,20 @@ function getTuneAudioButtonLabel(audioState) {
 
 function getTuneAudioButtonSymbol(audioState) {
   if (audioState.status === "playing") {
-    return "||";
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
+        <rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor" />
+        <rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor" />
+      </svg>
+    `;
   }
 
   if (audioState.status === "paused" || audioState.status === "idle") {
-    return "▶";
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
+        <path d="M8 5.5v13l10-6.5-10-6.5z" fill="currentColor" />
+      </svg>
+    `;
   }
 
   return "";
@@ -319,7 +328,7 @@ function renderTuneAudioButtonContent(audioState) {
   }
 
   return `
-    <span class="tune-audio__button-icon" aria-hidden="true">${escapeHtml(symbol)}</span>
+    <span class="tune-audio__button-icon" aria-hidden="true">${symbol}</span>
     <span class="tune-audio__button-label">${escapeHtml(label)}</span>
   `.trim();
 }

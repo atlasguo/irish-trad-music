@@ -291,10 +291,10 @@ code {
 .map-placeholder__card,
 .app-state__card {
   width: min(560px, 100%);
-  padding: 28px;
-  border: 1px solid rgba(255, 248, 233, 0.18);
-  border-radius: 24px;
-  color: #fff9eb;
+  font-family: var(--ui-font-family);
+  font-weight: 800;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
   background: rgba(247, 240, 224, 0.12);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
@@ -311,8 +311,17 @@ code {
   line-height: 1;
 }
 
-.map-placeholder__card p,
-.app-state__card p {
+.map-placeholder__card h2 {
+  margin: 0 0 12px;
+  font-family: var(--title-font-family);
+  font-weight: var(--title-font-weight);
+  -webkit-text-stroke: 0.6px rgba(19,45,41,0.18);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.06);
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1;
+}
+
+.app-state__card h1 {
   margin: 0;
   color: rgba(255, 249, 235, 0.86);
 }
@@ -382,13 +391,14 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  padding-left: 8px;
   min-height: 40px;
 }
 
 .sidebar__brand-copy {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 10px;
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
@@ -415,21 +425,22 @@ code {
 .sidebar__brand-text {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   flex: 1 1 auto;
   gap: 0.14em;
   min-width: 0;
   max-width: 100%;
   white-space: normal;
-  font-size: clamp(1.0rem, 2.4vw, 1.25rem);
+  font-size: clamp(0.93rem, 2.12vw, 1.12rem);
   line-height: 1.06;
-  text-align: center;
+  text-align: left;
 }
 
 .sidebar__brand-line {
   display: block;
   max-width: 100%;
   white-space: nowrap;
+  text-align: left;
 }
 
 .sidebar__brand-mark {
@@ -438,9 +449,9 @@ code {
   height: 36px;
   object-fit: cover;
   flex: 0 0 36px;
-  margin-right: -22px;
-  transform: translateX(12px);
-  transition: transform 160ms ease, margin 160ms ease;
+  margin-right: 0;
+  transform: none;
+  transition: none;
 }
 .sheet-panel-header__copy {
   display: inline-flex;
@@ -1081,10 +1092,16 @@ code {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 1.08rem;
+  height: 1.08rem;
   min-width: 1.08rem;
-  font-size: 1.06em;
-  font-weight: 700;
   line-height: 1;
+}
+
+.tune-audio__button-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .tune-audio__button-label {
@@ -2220,24 +2237,64 @@ select option {
   }
 
   .mobile-topbar__brand {
-    gap: 8px;
+    gap: 6px;
   }
 
   .mobile-topbar__mark {
     width: 32px;
     height: 32px;
     flex-basis: 32px;
+    margin-right: 0;
+    transform: none;
   }
 
   .mobile-topbar__title {
-    gap: 0.14em;
-    font-size: clamp(0.7rem, 2.7vw, 1rem);
-    line-height: 1.08;
-    letter-spacing: 0.028em;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.16em;
+    font-size: clamp(0.78rem, 2.7vw, 1.08rem);
+    line-height: 1;
+    letter-spacing: 0.018em;
+    white-space: nowrap;
+  }
+
+  .mobile-topbar__title .mobile-topbar__line {
+    display: inline;
+    white-space: normal;
+  }
+
+  @media (max-width: 450px) {
+    .mobile-topbar__title {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.22em;
+      white-space: normal;
+      text-align: left;
+    }
+
+    .mobile-topbar__title .mobile-topbar__line {
+      display: block;
+      white-space: nowrap;
+      width: 100%;
+      text-align: left;
+    }
   }
 
   .mobile-topbar__actions {
     gap: 6px;
+  }
+
+  .mobile-topbar__actions .button-icon {
+    display: none;
+  }
+
+  .browse-list__button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .browse-list__button-icon {
+    display: none;
   }
 
   .mobile-topbar__actions .mobile-panel-toggle,
@@ -2253,7 +2310,7 @@ select option {
     min-width: 0;
     height: var(--ui-compact-control-height);
     min-height: var(--ui-compact-control-height);
-    padding: 0 12px;
+    padding: 0 14px;
     font-size: 0.72rem;
     letter-spacing: 0.03em;
     box-shadow: 0 8px 16px rgba(15, 36, 31, 0.16);
