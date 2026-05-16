@@ -27,7 +27,7 @@ const siteMetadata = {
     [
       { text: "Cartography by Atlas Guo | " },
       {
-        text: "Report an error",
+        text: "About this map",
         href: "https://cartoguophy.com/maps/irish_trad_music.html",
       },
     ],

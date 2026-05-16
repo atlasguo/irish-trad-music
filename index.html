@@ -32,7 +32,7 @@
         <div class="mobile-topbar__actions">
           <button id="mobileSidebarToggle" class="mobile-panel-toggle mobile-panel-toggle--secondary is-hidden"
             type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
-            <span class="button-icon" aria-hidden="true">&#9776;</span>
+            <span class="button-icon button-icon--topbar" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="15" y2="12"/></svg></span>
             <span class="mobile-panel-toggle__state" data-mobile-sidebar-state aria-hidden="true">
               Menu
             </span>
@@ -85,9 +85,13 @@
 
     <div id="statusOverlay" class="app-state">
       <div class="app-state__card">
+        <img class="app-state__mark" src="./assets/icons/irish-trad-music-icon.png" alt="" aria-hidden="true" />
         <p class="eyebrow">Atlas of Irish Traditional Music</p>
-        <h1>Loading the atlas...</h1>
+        <h1>Loading the atlas…</h1>
         <p>Fetching places, linked tunes, and map-ready metadata.</p>
+        <div class="app-state__loader" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
       </div>
     </div>
   </div>

@@ -47,19 +47,13 @@ const TUNE_AUDIO_INSTRUMENT_OPTIONS = [
 ];
 
 const DEFAULT_TUNE_AUDIO_INSTRUMENT_PROGRAM = 47; // Harp remains the default
+const SPARKLE_STAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 36" aria-hidden="true"><path d="M10 0C10 9 15 18 20 18C15 18 10 27 10 36C10 27 5 18 0 18C5 18 10 9 10 0Z" fill="currentColor"/></svg>`;
+
 const UI_ICONS = {
   chevron: "&#8250;",
   map: "&gt;",
-  random: `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
-      <polygon points="12,3 14,9.5 16.5,12 14,14.5 12,20 10,14.5 7.5,12 10,9.5" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>
-  `,
-  randomTune: `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
-      <polygon points="12,3 14,9.5 16.5,12 14,14.5 12,20 10,14.5 7.5,12 10,9.5" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>
-  `,
+  random: SPARKLE_STAR_SVG,
+  randomTune: SPARKLE_STAR_SVG,
   reset: "&#8634;",
 };
 
@@ -941,7 +935,7 @@ function renderTunesList(context) {
           />
         </label>
 
-        <div class="control-row">
+        <div class="control-row control-row--filter">
           <label class="field field--inline">
             <span>Type</span>
             <select class="select-input" data-field="tunes-type-filter">

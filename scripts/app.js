@@ -136,7 +136,8 @@ function getMobileSidebarPanelStatePatch() {
 function renderStatus(title, message) {
   elements.statusOverlay.innerHTML = `
     <div class="app-state__card">
-      <p class="eyebrow site-title-text">Atlas of Irish Traditional Music</p>
+      <img class="app-state__mark" src="./assets/icons/irish-trad-music-icon.png" alt="" aria-hidden="true" />
+      <p class="eyebrow">Atlas of Irish Traditional Music</p>
       <h1>${title}</h1>
       <p>${message}</p>
     </div>

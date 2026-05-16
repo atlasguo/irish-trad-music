@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"c:\\\\Users\\\\atlas\\\\Documents\\\\GitHub\\\\irish-trad-music\\\\assets\\\\icons\" /b)"
+    ]
+  }
+}

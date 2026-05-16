@@ -83,7 +83,7 @@ const LABEL_MODE_BASEMAP = "basemap";
 const LABEL_MODE_SYMBOL = "symbol";
 const LABEL_MODE_OFF = "off";
 const MAP_UI_ICONS = {
-  legend: "&#9638;",
+  legend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="2.5" cy="3" r="2"/><rect x="6" y="2" width="10" height="2" rx="1" opacity="0.65"/><circle cx="2.5" cy="8" r="2"/><rect x="6" y="7" width="10" height="2" rx="1" opacity="0.65"/><circle cx="2.5" cy="13" r="2"/><rect x="6" y="12" width="10" height="2" rx="1" opacity="0.65"/></svg>`,
 };
 
 function renderMapUiIcon(icon, className = "button-icon") {
@@ -2177,7 +2177,7 @@ export function createMapController({
         String(!currentIsNarrowViewport),
       );
       mobileLegendToggle.innerHTML = `
-        ${renderMapUiIcon(MAP_UI_ICONS.legend)}
+        ${renderMapUiIcon(MAP_UI_ICONS.legend, "button-icon button-icon--topbar")}
         <span>Legend</span>
       `;
     }
