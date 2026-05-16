@@ -12,6 +12,10 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function renderUiIcon(icon, className = "button-icon") {
+  return `<span class="${className}" aria-hidden="true">${icon}</span>`;
+}
+
 function getTheSessionTuneUrl(tuneId) {
   return `https://thesession.org/tunes/${encodeURIComponent(String(tuneId || ""))}`;
 }
@@ -43,6 +47,21 @@ const TUNE_AUDIO_INSTRUMENT_OPTIONS = [
 ];
 
 const DEFAULT_TUNE_AUDIO_INSTRUMENT_PROGRAM = 47; // Harp remains the default
+const UI_ICONS = {
+  chevron: "&#8250;",
+  map: "&gt;",
+  random: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
+      <polygon points="12,3 14,9.5 16.5,12 14,14.5 12,20 10,14.5 7.5,12 10,9.5" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+  `,
+  randomTune: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-hidden="true">
+      <polygon points="12,3 14,9.5 16.5,12 14,14.5 12,20 10,14.5 7.5,12 10,9.5" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+  `,
+  reset: "&#8634;",
+};
 
 let abcjsScriptPromise = null;
 let smplrModulePromise = null;
@@ -780,7 +799,17 @@ function renderPlacesList(context) {
         </div>
       </section>
 
-      <p class="result-count">${numberFormatter.format(filteredPlaces.length)} places in total</p>
+      <div class="result-row">
+        <p class="result-count">${numberFormatter.format(filteredPlaces.length)} places in total</p>
+        <button
+          class="random-button"
+          type="button"
+          data-action="random-place"
+        >
+          Random place
+            ${renderUiIcon(UI_ICONS.randomTune, "button-icon button-icon--random")}
+        </button>
+      </div>
 
       ${
         filteredPlaces.length > 0
@@ -800,6 +829,7 @@ function renderPlacesList(context) {
                           <strong>${escapeHtml(place.name)}</strong>
                           ${renderPlaceListMeta(place, atlasData)}
                         </span>
+                        ${renderUiIcon(UI_ICONS.chevron, "browse-list__button-icon")}
                       </button>
                     </li>
                   `,
@@ -873,6 +903,7 @@ function renderPlaceDetail(context, backLink) {
                         formatAlternativeNameCountLabel(tune.alternateNames.length),
                       ])}
                     </span>
+                    ${renderUiIcon(UI_ICONS.chevron, "browse-list__button-icon")}
                   </button>
                 </li>
               `,
@@ -920,10 +951,11 @@ function renderTunesList(context) {
           <button
             class="filter-reset-button"
             type="button"
-            data-action="reset-tunes-type-filter"
-            ${state.tunesTypeFilter === "all" ? "disabled" : ""}
-          >
+          data-action="reset-tunes-type-filter"
+          ${state.tunesTypeFilter === "all" ? "disabled" : ""}
+        >
             Reset
+            ${renderUiIcon(UI_ICONS.reset, "button-icon button-icon--reset")}
           </button>
         </div>
 
@@ -940,7 +972,17 @@ function renderTunesList(context) {
         </div>
       </section>
 
-      <p class="result-count">${numberFormatter.format(filteredTunes.length)} tunes in total</p>
+      <div class="result-row">
+        <p class="result-count">${numberFormatter.format(filteredTunes.length)} tunes in total</p>
+        <button
+          class="random-button"
+          type="button"
+          data-action="random-tune"
+        >
+          Random tune
+          ${renderUiIcon(UI_ICONS.random, "button-icon button-icon--random")}
+        </button>
+      </div>
 
       ${
         filteredTunes.length > 0
@@ -964,6 +1006,7 @@ function renderTunesList(context) {
                             formatAlternativeNameCountLabel(tune.alternateNames.length),
                           ])}
                         </span>
+                        ${renderUiIcon(UI_ICONS.chevron, "browse-list__button-icon")}
                       </button>
                     </li>
                   `,
@@ -1032,6 +1075,7 @@ function renderTuneDetail(context, tuneAudioState, backLink) {
                       data-place-id="${escapeHtml(place.id)}"
                     >
                       View on map
+                      ${renderUiIcon(UI_ICONS.map, "button-icon button-icon--map")}
                     </button>
                   </div>
                 </li>
@@ -1863,6 +1907,14 @@ export function createUIController({ elements, actions, charts }) {
     }
   }
 
+  function getRandomArrayItem(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return null;
+    }
+
+    return items[Math.floor(Math.random() * items.length)];
+  }
+
   function getTabActivationDelayMs() {
     const durationValue = getComputedStyle(elements.sidebarTabs).getPropertyValue(
       "--tab-activate-ms",
@@ -1949,10 +2001,28 @@ export function createUIController({ elements, actions, charts }) {
       captureCurrentListSnapshot("places");
       rememberBackTarget(getPlaceDetailViewKey(placeId));
       actions.selectPlace(placeId);
+    } else if (action === "random-place") {
+      const randomPlace = getRandomArrayItem(latestRenderContext?.filteredPlaces);
+      if (!randomPlace) {
+        return;
+      }
+
+      captureCurrentListSnapshot("places");
+      rememberBackTarget(getPlaceDetailViewKey(randomPlace.id));
+      actions.selectPlace(randomPlace.id);
     } else if (action === "select-tune") {
       captureCurrentListSnapshot("tunes");
       rememberBackTarget(getTuneDetailViewKey(tuneId));
       actions.selectTune(tuneId, { preservePlace: false, focusMode: "bounds" });
+    } else if (action === "random-tune") {
+      const randomTune = getRandomArrayItem(latestRenderContext?.filteredTunes);
+      if (!randomTune) {
+        return;
+      }
+
+      captureCurrentListSnapshot("tunes");
+      rememberBackTarget(getTuneDetailViewKey(randomTune.id));
+      actions.selectTune(randomTune.id, { preservePlace: false, focusMode: "bounds" });
     } else if (action === "select-tune-from-place") {
       rememberBackTarget(getTuneDetailViewKey(tuneId));
       queueTabCommit("tunes", () => {

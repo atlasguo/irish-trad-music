@@ -26,7 +26,10 @@ const siteMetadata = {
     ],
     [
       { text: "Cartography by Atlas Guo | " },
-      { text: "Report an error", href: "mailto:cartoguophy@gmail.com" },
+      {
+        text: "Report an error",
+        href: "https://cartoguophy.com/maps/irish_trad_music.html",
+      },
     ],
     [
       { text: "\u00A9 2026 " },

@@ -82,6 +82,14 @@ const MAP_MODE_BLOCK = "block";
 const LABEL_MODE_BASEMAP = "basemap";
 const LABEL_MODE_SYMBOL = "symbol";
 const LABEL_MODE_OFF = "off";
+const MAP_UI_ICONS = {
+  legend: "&#9638;",
+};
+
+function renderMapUiIcon(icon, className = "button-icon") {
+  return `<span class="${className}" aria-hidden="true">${icon}</span>`;
+}
+
 const SYMBOL_LABEL_VISUAL_PRIORITY = [
   "right",
   "left",
@@ -2168,7 +2176,10 @@ export function createMapController({
         "aria-hidden",
         String(!currentIsNarrowViewport),
       );
-      mobileLegendToggle.textContent = "Legend";
+      mobileLegendToggle.innerHTML = `
+        ${renderMapUiIcon(MAP_UI_ICONS.legend)}
+        <span>Legend</span>
+      `;
     }
   }
 
