@@ -66,9 +66,12 @@ const RING_SHADOW_COLOR = [86, 86, 86];
 const ACTIVE_PLACE_STROKE_COLOR = [176, 113, 61];
 const ACTIVE_PLACE_NON_TOTAL_STROKE_COLOR = [94, 94, 94];
 const ACTIVE_PLACE_OUTER_STROKE_WIDTH = 4.2;
-const ACTIVE_PLACE_OUTER_STROKE_WIDTH_TOTAL = 5.4;
+const ACTIVE_PLACE_OUTER_STROKE_WIDTH_TOTAL = 7;
 const ACTIVE_PLACE_OUTER_STROKE_WIDTH_NON_TOTAL = 4.2;
-const ACTIVE_PLACE_INNER_STROKE_WIDTH = 1.4;
+const ACTIVE_PLACE_INNER_STROKE_WIDTH = 1.8;
+const ACTIVE_PLACE_GLOW_RADIUS_OFFSET = 7;
+const ACTIVE_PLACE_GLOW_OPACITY = 0.42;
+const ACTIVE_PLACE_GLOW_BLUR = 0.82;
 const ACTIVE_PLACE_RADIUS_OFFSET_TOTAL = 1.7;
 const ACTIVE_PLACE_RADIUS_OFFSET_RING = 1.7;
 const ACTIVE_PLACE_RADIUS_OFFSET_BLOCK = -(ACTIVE_PLACE_OUTER_STROKE_WIDTH / 2);
@@ -82,6 +85,16 @@ const MAP_MODE_BLOCK = "block";
 const LABEL_MODE_BASEMAP = "basemap";
 const LABEL_MODE_SYMBOL = "symbol";
 const LABEL_MODE_OFF = "off";
+const COUNTY_VISIBILITY_ON = "on";
+const COUNTY_VISIBILITY_OFF = "off";
+const COUNTY_SYMBOL_COLOR = [112, 88, 126];
+const COUNTY_LAYER_IDS = [
+  "county-boundaries-glow-wide-layer",
+  "county-boundaries-glow-mid-layer",
+  "county-boundaries-layer",
+  "county-labels-layer",
+];
+const COUNTY_DATA_URL = new URL("../data/counties.geojson", import.meta.url).href;
 const MAP_UI_ICONS = {
   legend: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="2.5" cy="3" r="2"/><rect x="6" y="2" width="10" height="2" rx="1" opacity="0.65"/><circle cx="2.5" cy="8" r="2"/><rect x="6" y="7" width="10" height="2" rx="1" opacity="0.65"/><circle cx="2.5" cy="13" r="2"/><rect x="6" y="12" width="10" height="2" rx="1" opacity="0.65"/></svg>`,
 };
@@ -1874,6 +1887,33 @@ function renderLayerControlsMarkup() {
         </button>
       </div>
     </div>
+    <div class="map-legend__mode">
+      <p class="map-legend__mode-label">Counties</p>
+      <div
+        class="map-legend__mode-toggle map-legend__mode-toggle--binary"
+        role="radiogroup"
+        aria-label="County boundaries and labels"
+      >
+        <button
+          type="button"
+          class="map-legend__mode-button"
+          data-county-visibility="${COUNTY_VISIBILITY_ON}"
+          role="radio"
+          aria-checked="false"
+        >
+          On
+        </button>
+        <button
+          type="button"
+          class="map-legend__mode-button"
+          data-county-visibility="${COUNTY_VISIBILITY_OFF}"
+          role="radio"
+          aria-checked="true"
+        >
+          Off
+        </button>
+      </div>
+    </div>
   `;
 }
 
@@ -2082,6 +2122,7 @@ export function createMapController({
   let lockedPlace = null;
   let hoveredPlace = null;
   let currentLabelMode = LABEL_MODE_SYMBOL;
+  let currentCountyVisibility = COUNTY_VISIBILITY_OFF;
   let currentSymbolLabelAnchorSignature = "";
   let basemapLabelLayerIds = [];
   let latestViewportPadding =
@@ -2575,6 +2616,39 @@ export function createMapController({
     }
 
     [
+      "active-place-glow-layer",
+      "related-places-glow-layer",
+    ].forEach((layerId) => {
+      if (!map.getLayer(layerId)) {
+        return;
+      }
+
+      setLayerVisibility(layerId, "visible");
+      map.setPaintProperty(
+        layerId,
+        "circle-radius",
+        [
+          "+",
+          buildActivePlaceRadiusExpressionForMode(currentMapMode),
+          ACTIVE_PLACE_GLOW_RADIUS_OFFSET,
+        ],
+      );
+      map.setPaintProperty(
+        layerId,
+        "circle-color",
+        [
+          "coalesce",
+          ["get", "activeStrokeColor"],
+          `rgba(${
+            (isNonTotalMapMode(currentMapMode)
+              ? ACTIVE_PLACE_NON_TOTAL_STROKE_COLOR
+              : ACTIVE_PLACE_STROKE_COLOR).join(", ")
+          }, 1)`,
+        ],
+      );
+    });
+
+    [
       "active-place-outer-stroke-layer",
       "related-places-outer-stroke-layer",
     ].forEach((layerId) => {
@@ -2648,6 +2722,7 @@ export function createMapController({
 
   function handleLegendClick(event) {
     handleLayerControlsClick(event);
+    handleCountyControlsClick(event);
 
     const modeButton = event.target.closest("[data-map-mode]");
     if (!modeButton) {
@@ -2755,8 +2830,10 @@ export function createMapController({
     }
 
     [
+      "related-places-glow-layer",
       "related-places-outer-stroke-layer",
       "related-places-layer",
+      "active-place-glow-layer",
       "active-place-outer-stroke-layer",
       "active-place-layer",
       "active-place-rect-layer",
@@ -2785,6 +2862,24 @@ export function createMapController({
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-checked", String(isActive));
     });
+
+    legendElement.querySelectorAll("[data-county-visibility]").forEach((button) => {
+      const buttonVisibility = button.getAttribute("data-county-visibility");
+      const isActive = buttonVisibility === currentCountyVisibility;
+
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-checked", String(isActive));
+    });
+  }
+
+  function applyCountyVisibility() {
+    const visibility =
+      currentCountyVisibility === COUNTY_VISIBILITY_ON ? "visible" : "none";
+
+    COUNTY_LAYER_IDS.forEach((layerId) => {
+      setLayerVisibility(layerId, visibility);
+    });
+    updateLayerControlsState();
   }
 
   function applyBasemapLabelVisibility() {
@@ -2902,6 +2997,33 @@ export function createMapController({
 
     if (hasLoaded) {
       applyLabelVisibilityStates();
+    } else {
+      updateLayerControlsState();
+    }
+  }
+
+  function handleCountyControlsClick(event) {
+    const button = event.target.closest("[data-county-visibility]");
+    if (!button) {
+      return;
+    }
+
+    const nextVisibility = button.getAttribute("data-county-visibility");
+    if (
+      nextVisibility !== COUNTY_VISIBILITY_ON &&
+      nextVisibility !== COUNTY_VISIBILITY_OFF
+    ) {
+      return;
+    }
+
+    if (nextVisibility === currentCountyVisibility) {
+      return;
+    }
+
+    currentCountyVisibility = nextVisibility;
+
+    if (hasLoaded) {
+      applyCountyVisibility();
     } else {
       updateLayerControlsState();
     }
@@ -3050,6 +3172,135 @@ export function createMapController({
       updateMapModeAppearance();
     });
 
+    map.addSource("counties-source", {
+      type: "geojson",
+      data: COUNTY_DATA_URL,
+    });
+
+    addLayerBelowLabels({
+      id: "county-boundaries-glow-wide-layer",
+      type: "line",
+      source: "counties-source",
+      filter: ["==", ["get", "featureKind"], "boundary"],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+        visibility: "none",
+      },
+      paint: {
+        "line-color": rgbToCss(COUNTY_SYMBOL_COLOR),
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 9,
+          9, 12,
+          12, 15.5,
+        ],
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 0.06,
+          10, 0.1,
+        ],
+        "line-blur": 4.2,
+      },
+    });
+
+    addLayerBelowLabels({
+      id: "county-boundaries-glow-mid-layer",
+      type: "line",
+      source: "counties-source",
+      filter: ["==", ["get", "featureKind"], "boundary"],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+        visibility: "none",
+      },
+      paint: {
+        "line-color": rgbToCss(COUNTY_SYMBOL_COLOR),
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 5,
+          9, 6.8,
+          12, 8.8,
+        ],
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 0.12,
+          10, 0.18,
+        ],
+        "line-blur": 2.1,
+      },
+    });
+
+    addLayerBelowLabels({
+      id: "county-boundaries-layer",
+      type: "line",
+      source: "counties-source",
+      filter: ["==", ["get", "featureKind"], "boundary"],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+        visibility: "none",
+      },
+      paint: {
+        "line-color": rgbToCss(COUNTY_SYMBOL_COLOR),
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 0.8,
+          9, 1.35,
+          12, 2,
+        ],
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 0.68,
+          10, 0.88,
+        ],
+      },
+    });
+
+    addLayerBelowLabels({
+      id: "county-labels-layer",
+      type: "symbol",
+      source: "counties-source",
+      filter: ["==", ["get", "featureKind"], "label"],
+      minzoom: 5.5,
+      maxzoom: 11,
+      layout: {
+        "text-field": ["get", "countyName"],
+        "text-transform": "uppercase",
+        "text-font": ["Manrope Bold", "Manrope Medium"],
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6, 12.5,
+          9, 16,
+        ],
+        "text-max-width": 8,
+        "text-letter-spacing": 0.12,
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        visibility: "none",
+      },
+      paint: {
+        "text-color": rgbaToCss(COUNTY_SYMBOL_COLOR, 0.82),
+        "text-halo-color": "rgba(255, 248, 233, 0.9)",
+        "text-halo-width": 1.4,
+        "text-halo-blur": 0.4,
+      },
+    });
+
     map.addSource("places-source", {
       type: "geojson",
       data: buildMapCollection(atlasData.places),
@@ -3178,6 +3429,26 @@ export function createMapController({
     });
 
     addLayerBelowPlaceMarkers({
+      id: "related-places-glow-layer",
+      type: "circle",
+      source: "related-places-source",
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["get", "tuneCount"],
+          ...PLACE_RADIUS_STOPS.flatMap((stop) => [
+            stop.count,
+            stop.radius + ACTIVE_PLACE_RADIUS_OFFSET_TOTAL + ACTIVE_PLACE_GLOW_RADIUS_OFFSET,
+          ]),
+        ],
+        "circle-color": `rgba(${ACTIVE_PLACE_STROKE_COLOR.join(", ")}, 1)`,
+        "circle-opacity": ACTIVE_PLACE_GLOW_OPACITY,
+        "circle-blur": ACTIVE_PLACE_GLOW_BLUR,
+      },
+    });
+
+    addLayerBelowPlaceMarkers({
       id: "related-places-outer-stroke-layer",
       type: "circle",
       source: "related-places-source",
@@ -3218,6 +3489,26 @@ export function createMapController({
 
     ensureActivePlaceRectImages().catch((error) => {
       console.error(error);
+    });
+
+    addLayerBelowPlaceMarkers({
+      id: "active-place-glow-layer",
+      type: "circle",
+      source: "active-place-source",
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["get", "tuneCount"],
+          ...PLACE_RADIUS_STOPS.flatMap((stop) => [
+            stop.count,
+            stop.radius + ACTIVE_PLACE_RADIUS_OFFSET_TOTAL + ACTIVE_PLACE_GLOW_RADIUS_OFFSET,
+          ]),
+        ],
+        "circle-color": `rgba(${ACTIVE_PLACE_STROKE_COLOR.join(", ")}, 1)`,
+        "circle-opacity": ACTIVE_PLACE_GLOW_OPACITY,
+        "circle-blur": ACTIVE_PLACE_GLOW_BLUR,
+      },
     });
 
     addLayerBelowPlaceMarkers({
@@ -3323,6 +3614,7 @@ export function createMapController({
 
     attachResetButtonToNavigationGroup();
     applyLabelVisibilityStates();
+    applyCountyVisibility();
     updateMapModeAppearance();
 
     hasLoaded = true;
@@ -3419,6 +3711,10 @@ export function createMapController({
               (place) => !selectedPlace || place.id !== selectedPlace.id,
             )
           : [];
+        const singleRelatedPlace =
+          !activePlace && relatedPlaces.length === 1
+            ? resolveVisiblePlace(relatedPlaces[0])
+            : null;
 
         updateSource(
           "related-places-source",
@@ -3430,8 +3726,9 @@ export function createMapController({
           createActivePlaceCollection(getHighlightedPlace(), currentMapMode),
         );
 
-        if (getHighlightedPlace()) {
-          showPopupForPlace(getHighlightedPlace());
+        const popupPlace = getHighlightedPlace() || singleRelatedPlace;
+        if (popupPlace) {
+          showPopupForPlace(popupPlace);
         } else {
           hoverPopup.remove();
         }

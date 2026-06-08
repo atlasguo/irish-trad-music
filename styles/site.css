@@ -79,6 +79,17 @@
   --ui-list-button-font-size: var(--font-size-xs);
   --ui-primary-button-shadow: 0 6px 14px rgba(160, 78, 47, 0.14);
   --ui-primary-button-shadow-hover: 0 8px 18px rgba(160, 78, 47, 0.18);
+  --ui-accent-button-background: #b26f4a;
+  --ui-accent-button-background-hover: #bd7952;
+  --ui-accent-button-border: #a86543;
+  --ui-accent-button-border-hover: #9c5c3a;
+  --ui-accent-button-color: #fffaf0;
+  --ui-accent-button-shadow:
+    inset 0 -1px 0 rgba(124, 68, 42, 0.16),
+    var(--ui-primary-button-shadow);
+  --ui-accent-button-shadow-hover:
+    inset 0 -1px 0 rgba(124, 68, 42, 0.14),
+    var(--ui-primary-button-shadow-hover);
   --mobile-topbar-height: 0px;
   --mobile-panel-height: clamp(320px, 60svh, 640px);
   --mobile-panel-side-inset: 12px;
@@ -700,15 +711,15 @@ code {
   height: var(--ui-primary-button-height);
   min-height: var(--ui-primary-button-height);
   padding: 0 14px;
-  border: 1px solid rgba(255, 248, 233, 0.16);
+  border: 1px solid var(--ui-accent-button-border);
   border-radius: var(--ui-pill-radius);
   font-size: var(--ui-button-font-size);
   font-weight: var(--ui-button-font-weight);
   line-height: var(--ui-button-line-height);
   letter-spacing: 0.01em;
-  color: #fff8e8;
-  background: linear-gradient(135deg, var(--theme-green), var(--theme-green-deep));
-  box-shadow: 0 6px 14px rgba(15, 36, 31, 0.14);
+  color: var(--ui-accent-button-color);
+  background: var(--ui-accent-button-background);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .sidebar__toggle--icon {
@@ -725,9 +736,9 @@ code {
 }
 
 .mobile-panel-toggle--secondary {
-  border-color: rgba(160, 78, 47, 0.28);
-  background: linear-gradient(135deg, var(--theme-orange), var(--theme-orange-deep));
-  box-shadow: var(--ui-primary-button-shadow);
+  border-color: var(--ui-accent-button-border);
+  background: var(--ui-accent-button-background);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .sidebar__toggle:hover,
@@ -735,12 +746,15 @@ code {
 .ghost-button:hover,
 .back-link:hover {
   transform: translateY(-1px);
+  border-color: var(--ui-accent-button-border-hover);
+  background: var(--ui-accent-button-background-hover);
+  box-shadow: var(--ui-accent-button-shadow-hover);
 }
 
 .mobile-panel-toggle--secondary:hover {
-  border-color: rgba(160, 78, 47, 0.42);
-  background: linear-gradient(135deg, var(--theme-orange-hover), var(--theme-orange));
-  box-shadow: var(--ui-primary-button-shadow-hover);
+  border-color: var(--ui-accent-button-border-hover);
+  background: var(--ui-accent-button-background-hover);
+  box-shadow: var(--ui-accent-button-shadow-hover);
 }
 
 .mobile-panel-toggle {
@@ -1325,10 +1339,10 @@ code {
 .filter-reset-button {
   align-self: flex-end;
   min-width: 5.25rem;
-  border: 1px solid rgba(160, 78, 47, 0.28);
-  color: #fff9ec;
-  background: linear-gradient(135deg, var(--theme-orange), var(--theme-orange-deep));
-  box-shadow: var(--ui-primary-button-shadow);
+  border: 1px solid var(--ui-accent-button-border);
+  color: var(--ui-accent-button-color);
+  background: var(--ui-accent-button-background);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .random-button {
@@ -1337,34 +1351,34 @@ code {
   height: var(--ui-list-button-height);
   min-height: var(--ui-list-button-height);
   padding: 0 11px;
-  border: 1px solid rgba(160, 78, 47, 0.28);
+  border: 1px solid var(--ui-accent-button-border);
   font-size: var(--ui-list-button-font-size);
-  color: #fff9ec;
-  background: linear-gradient(135deg, var(--theme-orange), var(--theme-orange-deep));
-  box-shadow: var(--ui-primary-button-shadow);
+  color: var(--ui-accent-button-color);
+  background: var(--ui-accent-button-background);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .filter-reset-button:hover:not(:disabled),
 .random-button:hover {
   transform: translateY(-1px);
-  border-color: rgba(160, 78, 47, 0.42);
-  background: linear-gradient(135deg, var(--theme-orange-hover), var(--theme-orange));
-  box-shadow: var(--ui-primary-button-shadow-hover);
+  border-color: var(--ui-accent-button-border-hover);
+  background: var(--ui-accent-button-background-hover);
+  box-shadow: var(--ui-accent-button-shadow-hover);
 }
 
 .filter-reset-button:focus-visible,
 .random-button:focus-visible {
   outline: none;
-  border-color: rgba(160, 78, 47, 0.42);
+  border-color: var(--ui-accent-button-border-hover);
   box-shadow:
     var(--ui-focus-ring),
-    var(--ui-primary-button-shadow-hover);
+    var(--ui-accent-button-shadow-hover);
 }
 
 .filter-reset-button:disabled {
   cursor: default;
   opacity: 0.46;
-  box-shadow: var(--ui-primary-button-shadow);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .text-input,
@@ -1669,7 +1683,7 @@ select option {
   min-height: var(--ui-primary-button-height);
   height: var(--ui-primary-button-height);
   padding: 0 12px;
-  border: 1px solid rgba(160, 78, 47, 0.28);
+  border: 1px solid var(--ui-accent-button-border);
   border-radius: var(--ui-pill-radius);
   font-size: var(--ui-button-font-size);
   font-weight: var(--ui-button-font-weight);
@@ -1677,15 +1691,15 @@ select option {
   letter-spacing: 0.01em;
   text-align: center;
   white-space: nowrap;
-  color: #fff9ec;
-  background: linear-gradient(135deg, var(--theme-orange), var(--theme-orange-deep));
-  box-shadow: var(--ui-primary-button-shadow);
+  color: var(--ui-accent-button-color);
+  background: var(--ui-accent-button-background);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .ghost-button:hover {
-  border-color: rgba(160, 78, 47, 0.42);
-  background: linear-gradient(135deg, var(--theme-orange-hover), var(--theme-orange));
-  box-shadow: var(--ui-primary-button-shadow-hover);
+  border-color: var(--ui-accent-button-border-hover);
+  background: var(--ui-accent-button-background-hover);
+  box-shadow: var(--ui-accent-button-shadow-hover);
 }
 
 .back-link {
@@ -1697,15 +1711,15 @@ select option {
   height: var(--ui-primary-button-height);
   min-height: var(--ui-primary-button-height);
   padding: 0 16px;
-  border: 1px solid rgba(199, 161, 93, 0.42);
+  border: 1px solid var(--ui-accent-button-border);
   border-radius: var(--ui-pill-radius);
   font-size: var(--ui-button-font-size);
   font-weight: 700;
   line-height: var(--ui-button-line-height);
   letter-spacing: 0.015em;
-  color: #fff9ec;
-  background: linear-gradient(135deg, var(--theme-green-hover), var(--theme-green-deep));
-  box-shadow: 0 8px 18px rgba(15, 36, 31, 0.16);
+  color: var(--ui-accent-button-color);
+  background: var(--ui-accent-button-background);
+  box-shadow: var(--ui-accent-button-shadow);
 }
 
 .back-link::before {
@@ -1716,9 +1730,9 @@ select option {
 }
 
 .back-link:hover {
-  border-color: rgba(199, 161, 93, 0.58);
-  background: linear-gradient(135deg, var(--theme-green), var(--theme-green-deep));
-  box-shadow: 0 10px 22px rgba(15, 36, 31, 0.2);
+  border-color: var(--ui-accent-button-border-hover);
+  background: var(--ui-accent-button-background-hover);
+  box-shadow: var(--ui-accent-button-shadow-hover);
 }
 
 .detail-list__row .ghost-button {
@@ -1749,6 +1763,16 @@ select option {
   box-shadow:
     var(--ui-focus-ring),
     0 10px 18px rgba(15, 36, 31, 0.06);
+}
+
+.sidebar__toggle:focus-visible,
+.mobile-panel-toggle:focus-visible,
+.ghost-button:focus-visible,
+.back-link:focus-visible {
+  border-color: var(--ui-accent-button-border-hover);
+  box-shadow:
+    var(--ui-focus-ring),
+    var(--ui-accent-button-shadow-hover);
 }
 
 .empty-card p {
@@ -1932,6 +1956,10 @@ select option {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.map-legend__mode-toggle--binary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .map-legend__mode-button {
   box-sizing: border-box;
   display: inline-flex;
@@ -1955,9 +1983,19 @@ select option {
 }
 
 .map-legend__mode-button.is-active {
+  border: 1px solid var(--theme-green-deep);
   color: #fff9ec;
   background: linear-gradient(135deg, var(--theme-green), var(--theme-green-deep));
-  box-shadow: 0 6px 14px rgba(15, 36, 31, 0.14);
+  box-shadow:
+    inset 0 -1px 0 rgba(8, 28, 24, 0.28),
+    0 6px 14px rgba(15, 36, 31, 0.14);
+}
+
+.map-legend__mode-button.is-active:hover {
+  background: linear-gradient(135deg, var(--theme-green-hover), var(--theme-green));
+  box-shadow:
+    inset 0 -1px 0 rgba(8, 28, 24, 0.24),
+    0 8px 18px rgba(15, 36, 31, 0.18);
 }
 
 .map-legend__title {

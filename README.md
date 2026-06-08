@@ -14,4 +14,5 @@ An atlas of Irish traditional music, linking places across Ireland to their asso
 
 - Data from TheSession and OpenStreetMap
 - Compiled and shared by Benjamin Becquet
+- County boundaries from Townlands.ie and OpenStreetMap, licensed under ODbL
 - Cartography by Atlas Guo (CartoGuophy.com)

@@ -2119,6 +2119,10 @@ export function createUIController({ elements, actions, charts }) {
       } = context;
       const previousState = latestState;
       const previousCommittedTab = latestState?.activeTab ?? null;
+      const shouldAutoPlaySelectedTune =
+        Boolean(selectedTune) &&
+        (previousState?.activeTab !== "tunes" ||
+          String(previousState?.selectedTuneId || "") !== String(selectedTune.id));
       latestRenderContext = context;
       const shouldScrollSidebarToTop = shouldResetSidebarScroll(previousState, state);
       syncBackTargetForCurrentView(previousState, state);
@@ -2262,6 +2266,10 @@ export function createUIController({ elements, actions, charts }) {
         }
       } else if (!restoredTuneView && shouldScrollSidebarToTop) {
         elements.sidebarContent.scrollTop = 0;
+      }
+
+      if (shouldAutoPlaySelectedTune) {
+        void playTuneAudio(selectedTune.id);
       }
     },
   };
