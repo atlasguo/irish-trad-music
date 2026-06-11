@@ -33,6 +33,16 @@ function getInitialStateFromLocation() {
 
   if (searchParams.get("tab") === "tunes" || tuneType) {
     initialState.activeTab = "tunes";
+    if (isNarrowViewport()) {
+      initialState.mobilePanel = "sidebar";
+    }
+  }
+
+  if (searchParams.get("tab") === "places") {
+    initialState.activeTab = "places";
+    if (isNarrowViewport()) {
+      initialState.mobilePanel = "sidebar";
+    }
   }
 
   if (tuneType) {

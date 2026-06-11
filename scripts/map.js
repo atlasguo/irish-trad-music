@@ -1091,7 +1091,7 @@ function createConeDirectionWheelSvg() {
 
   const viewHeight = cy + labelRadius + 14;
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${viewHeight}" style="width: 100%; display: block;" aria-label="Cone tune type legend" role="img">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${viewHeight}" style="width: 100%; max-width: 250px; display: block; margin: 0 auto;" aria-label="Cone tune type legend" role="img">
       ${sectorMarkup}
       <circle cx="${cx}" cy="${cy}" r="3" fill="rgba(70, 70, 70, 0.88)" />
       ${labelMarkup}
