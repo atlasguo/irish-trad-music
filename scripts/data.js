@@ -25,7 +25,7 @@ const siteMetadata = {
 
     ],
     [
-      { text: "Cartography by Atlas Guo | " },
+      { text: "Map Design by Atlas Guo | " },
       {
         text: "About this map",
         href: "https://cartoguophy.com/maps/irish_trad_music.html",
@@ -34,6 +34,7 @@ const siteMetadata = {
     [
       { text: "\u00A9 2026 " },
       { text: "CartoGuophy.com", href: "https://cartoguophy.com/" },
+      {text:" | CC BY-NC 4.0"}
     ],
   ],
 };
@@ -69,23 +70,163 @@ export const TUNE_TYPE_ORDER = [
   "waltz",
 ];
 
-const BLOCK_MARKER_VERSION = "v8";
-const RING_MARKER_VERSION = "v22";
-const CONE_MARKER_VERSION = "v29";
+const BLOCK_MARKER_VERSION = "v10";
+const RING_MARKER_VERSION = "v27";
+const CONE_MARKER_VERSION = "v32";
+
+export const TUNE_TYPE_SYMBOL_FILL_COLORS = Object.freeze({
+  green: "#718A60",
+  orange: "#C47759",
+  blue: "#5796BD",
+  purple: "#78618A",
+  gold: "#C5A45E",
+});
 
 export const TUNE_TYPE_DEFINITIONS = [
-  { key: "barndance", label: "Barndance", color: "#ad5b46", mapsFrom: "barndance" },
-  { key: "hornpipe", label: "Hornpipe", color: "#bf6946", mapsFrom: "hornpipe" },
-  { key: "jig", label: "Jig", color: "#c97c4c", mapsFrom: "jig" },
-  { key: "march", label: "March", color: "#ca9252", mapsFrom: "march" },
-  { key: "mazurka", label: "Mazurka", color: "#c1a459", mapsFrom: "mazurka" },
-  { key: "polka", label: "Polka", color: "#a7ac5d", mapsFrom: "polka" },
-  { key: "reel", label: "Reel", color: "#81a061", mapsFrom: "reel" },
-  { key: "slide", label: "Slide", color: "#638f74", mapsFrom: "slide" },
-  { key: "slipJig", label: "Slip Jig", color: "#58858a", mapsFrom: "slip jig" },
-  { key: "strathspey", label: "Strathspey", color: "#617b99", mapsFrom: "strathspey" },
-  { key: "threeTwo", label: "Three-Two", color: "#7a6d9d", mapsFrom: "three-two" },
-  { key: "waltz", label: "Waltz", color: "#956784", mapsFrom: "waltz" },
+  {
+    key: "barndance",
+    label: "Barndance",
+    color: "#ad5b46",
+    mapsFrom: "barndance",
+    iconPath: "./assets/icons/icon_barndance.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.green,
+    accent: ["X", "o", "x", "o"],
+    tempo: "medium",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "hornpipe",
+    label: "Hornpipe",
+    color: "#bf6946",
+    mapsFrom: "hornpipe",
+    iconPath: "./assets/icons/icon_hornpipe.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.green,
+    accent: ["X", "o", "x", "o"],
+    tempo: "medium",
+    swing: true,
+    scotchSnap: false,
+  },
+  {
+    key: "jig",
+    label: "Jig",
+    color: "#c97c4c",
+    mapsFrom: "jig",
+    iconPath: "./assets/icons/icon_jig.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.orange,
+    accent: ["X", "o", "o", "x", "o", "o"],
+    tempo: "fast",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "march",
+    label: "March",
+    color: "#ca9252",
+    mapsFrom: "march",
+    iconPath: "./assets/icons/icon_march.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.green,
+    accent: ["X", "o", "x", "o"],
+    tempo: "slow",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "mazurka",
+    label: "Mazurka",
+    color: "#c1a459",
+    mapsFrom: "mazurka",
+    iconPath: "./assets/icons/icon_mazurka.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.gold,
+    accent: ["o", "X", "o"],
+    tempo: "slow",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "polka",
+    label: "Polka",
+    color: "#a7ac5d",
+    mapsFrom: "polka",
+    iconPath: "./assets/icons/icon_polka.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.blue,
+    accent: ["X", "o"],
+    tempo: "fast",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "reel",
+    label: "Reel",
+    color: "#81a061",
+    mapsFrom: "reel",
+    iconPath: "./assets/icons/icon_reel.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.green,
+    accent: ["X", "o", "x", "o"],
+    tempo: "fast",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "slide",
+    label: "Slide",
+    color: "#638f74",
+    mapsFrom: "slide",
+    iconPath: "./assets/icons/icon_slide.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.purple,
+    accent: ["X", "o", "o", "x", "o", "o", "x", "o", "o", "x", "o", "o"],
+    tempo: "fast",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "slipJig",
+    label: "Slip Jig",
+    color: "#58858a",
+    mapsFrom: "slip jig",
+    iconPath: "./assets/icons/icon_slip_jig.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.orange,
+    accent: ["X", "o", "o", "x", "o", "o", "x", "o", "o"],
+    tempo: "medium",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "strathspey",
+    label: "Strathspey",
+    color: "#617b99",
+    mapsFrom: "strathspey",
+    iconPath: "./assets/icons/icon_strathspey.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.green,
+    accent: ["X", "o", "x", "o"],
+    tempo: "slow",
+    swing: false,
+    scotchSnap: true,
+  },
+  {
+    key: "threeTwo",
+    label: "Three-Two",
+    color: "#7a6d9d",
+    mapsFrom: "three-two",
+    iconPath: "./assets/icons/icon_three_two.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.gold,
+    accent: ["X", "x", "o"],
+    tempo: "slow",
+    swing: false,
+    scotchSnap: false,
+  },
+  {
+    key: "waltz",
+    label: "Waltz",
+    color: "#956784",
+    mapsFrom: "waltz",
+    iconPath: "./assets/icons/icon_waltz.png",
+    squareIconFill: TUNE_TYPE_SYMBOL_FILL_COLORS.gold,
+    accent: ["X", "o", "o"],
+    tempo: "slow",
+    swing: false,
+    scotchSnap: false,
+  },
 ];
 
 const TUNE_TYPE_DEFINITION_BY_KEY = new Map(
@@ -124,7 +265,7 @@ export function getTuneTypeKey(type) {
     return "jig";
   }
 
-  if (normalizedType === "slip jig") {
+  if (normalizedType === "slip jig" || normalizedType === "slipjig") {
     return "slipJig";
   }
 
@@ -140,7 +281,7 @@ export function getTuneTypeKey(type) {
     return "hornpipe";
   }
 
-  if (normalizedType === "three two") {
+  if (normalizedType === "three two" || normalizedType === "threetwo") {
     return "threeTwo";
   }
 
@@ -170,6 +311,17 @@ export function getTuneTypeKey(type) {
 export function getTuneTypeColor(type) {
   const tuneTypeKey = getTuneTypeKey(type);
   return TUNE_TYPE_DEFINITION_BY_KEY.get(tuneTypeKey)?.color || "#8c8171";
+}
+
+export function getTuneTypeSymbolColor(type) {
+  const tuneTypeKey = getTuneTypeKey(type);
+  const definition = TUNE_TYPE_DEFINITION_BY_KEY.get(tuneTypeKey);
+  return definition?.squareIconFill || getTuneTypeColor(type);
+}
+
+export function getTuneTypeIconPath(type) {
+  const tuneTypeKey = getTuneTypeKey(type);
+  return TUNE_TYPE_DEFINITION_BY_KEY.get(tuneTypeKey)?.iconPath || "";
 }
 
 export function formatTuneTypeLabel(type) {
@@ -584,6 +736,22 @@ export async function loadAtlasData() {
     }),
   );
 
+  function buildPlaceTypesChart(allPlaces) {
+    const tuneCounts = new Map();
+    allPlaces.forEach((place) => {
+      if (!place.placeType) return;
+      tuneCounts.set(place.placeType, (tuneCounts.get(place.placeType) || 0) + place.tuneCount);
+    });
+    return [...tuneCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([type, value]) => ({
+        rawType: type,
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+        value,
+      }));
+  }
+
   return {
     places,
     placesById,
@@ -592,15 +760,15 @@ export async function loadAtlasData() {
     placeNameCounts,
     tuneTypes: tuneTypesChart.map((entry) => entry.rawType),
     metrics: [
-      { label: "Places", value: places.length },
-      { label: "Tunes", value: mappedTunes.length },
       { label: "Tune types", value: tuneTypesChart.length },
+      { label: "Tunes", value: mappedTunes.length },
+      { label: "Places", value: places.length },
     ],
     tuneTypeTotals,
     topPlacesChart: buildTopPlacesChart(places),
     tuneTypesChart,
+    placeTypesChart: buildPlaceTypesChart(places),
     siteMetadata: { ...siteMetadata },
     bounds: buildBoundsFromPlaces(places),
   };
 }
-

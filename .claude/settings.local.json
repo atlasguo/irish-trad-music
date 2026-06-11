@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir \"c:\\\\Users\\\\atlas\\\\Documents\\\\GitHub\\\\irish-trad-music\\\\assets\\\\icons\" /b)"
+      "Bash(dir \"c:\\\\Users\\\\atlas\\\\Documents\\\\GitHub\\\\irish-trad-music\\\\assets\\\\icons\" /b)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(npm run *)",
+      "PowerShell(Start-Process \"http://localhost:8000\")",
+      "PowerShell(npm list -g @playwright/test 2>&1)",
+      "PowerShell(head -5)",
+      "Bash(pip install *)",
+      "Bash(python3 -m playwright install chromium --quiet)",
+      "Bash(python3 -m playwright install chromium)"
     ]
   }
 }

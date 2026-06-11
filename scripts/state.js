@@ -5,6 +5,7 @@ const uiState = {
   selectedTuneId: null,
   placesSearch: "",
   placesSort: "alpha",
+  placesTypeFilter: "all",
   tunesSearch: "",
   tunesTypeFilter: "all",
   tunesSort: "alpha",

@@ -5,7 +5,7 @@ An atlas of Irish traditional music, linking places across Ireland to their asso
 ## Features
 
 - Explore places and tune relationships on an interactive map
-- Switch between `Total`, `Ring`, `Block`, and `Cone` map modes
+- Switch between `Total`, `Ring`, `Block`, and `Cone` symbols
 - Browse places, tunes, and tune types from the side panel
 - Jump to a random place or tune from the browse tabs
 - Support mobile viewing by layout with a top bar and bottom panels

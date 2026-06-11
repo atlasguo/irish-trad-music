@@ -21,13 +21,13 @@
 
     <div id="mobileTopbar" class="mobile-topbar" aria-hidden="true">
       <div class="mobile-topbar__inner">
-        <div class="mobile-topbar__brand">
+        <a class="mobile-topbar__brand" href="./index.html" aria-label="Return to home">
           <img class="mobile-topbar__mark" src="./assets/icons/irish-trad-music-icon.png" alt="" />
           <span class="mobile-topbar__title site-title-text">
             <span class="mobile-topbar__line">Atlas of Irish</span>
             <span class="mobile-topbar__line">Traditional Music</span>
           </span>
-        </div>
+        </a>
 
         <div class="mobile-topbar__actions">
           <button id="mobileSidebarToggle" class="mobile-panel-toggle mobile-panel-toggle--secondary is-hidden"
@@ -51,7 +51,7 @@
       <div class="sidebar__chrome">
         <span class="sidebar__sheet-handle" aria-hidden="true"></span>
 
-        <div class="sidebar__brand" aria-hidden="true">
+        <a class="sidebar__brand" href="./index.html" aria-label="Return to home">
           <div class="sidebar__brand-copy">
             <img class="sidebar__brand-mark" src="./assets/icons/irish-trad-music-icon.png" alt="" />
             <span class="sidebar__brand-text site-title-text">
@@ -59,7 +59,7 @@
               <span class="sidebar__brand-line">Traditional Music</span>
             </span>
           </div>
-        </div>
+        </a>
 
         <nav id="sidebarTabs" class="sidebar__tabs" aria-label="Sidebar tabs">
           <button class="tab-button tab-button--active" type="button" data-action="switch-tab" data-tab="overview"
@@ -67,15 +67,15 @@
             <span class="tab-button__short">O</span>
             <span class="tab-button__label">Overview</span>
           </button>
-          <button class="tab-button" type="button" data-action="switch-tab" data-tab="places" aria-pressed="false"
-            title="Places">
-            <span class="tab-button__short">P</span>
-            <span class="tab-button__label">Place</span>
-          </button>
           <button class="tab-button" type="button" data-action="switch-tab" data-tab="tunes" aria-pressed="false"
             title="Tunes">
             <span class="tab-button__short">T</span>
             <span class="tab-button__label">Tune</span>
+          </button>
+          <button class="tab-button" type="button" data-action="switch-tab" data-tab="places" aria-pressed="false"
+            title="Places">
+            <span class="tab-button__short">P</span>
+            <span class="tab-button__label">Place</span>
           </button>
         </nav>
       </div>

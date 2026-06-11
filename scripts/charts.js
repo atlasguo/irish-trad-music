@@ -1,8 +1,38 @@
 import { CHART_COLORS } from "./config.js";
-import { getTuneTypeColor } from "./data.js";
+import { getTuneTypeColor, getTuneTypeIconPath, getTuneTypeSymbolColor } from "./data.js";
 
 export function createChartsController() {
   const chartInstances = [];
+  const tuneTypeIconImages = new Map();
+
+  function getTuneTypeIconImage(type, chart) {
+    const iconPath = getTuneTypeIconPath(type);
+    if (!iconPath) {
+      return null;
+    }
+
+    if (tuneTypeIconImages.has(iconPath)) {
+      return tuneTypeIconImages.get(iconPath);
+    }
+
+    const image = new Image();
+    const iconEntry = { image, status: "loading" };
+    tuneTypeIconImages.set(iconPath, iconEntry);
+    image.addEventListener("load", () => {
+      iconEntry.status = "loaded";
+      if (chart.ctx) {
+        chart.draw();
+      }
+    });
+    image.addEventListener("error", () => {
+      iconEntry.status = "error";
+      if (chart.ctx) {
+        chart.draw();
+      }
+    });
+    image.src = iconPath;
+    return iconEntry;
+  }
 
   function createTuneTypeTickDotsPlugin(entries) {
     return {
@@ -22,9 +52,16 @@ export function createChartsController() {
             return;
           }
 
-          const size = 11;
-          const x = yScale.left + 8 - size / 2;
+          const size = 24;
+          const x = yScale.left + 4;
           const top = y - size / 2;
+          const iconEntry = getTuneTypeIconImage(entry.rawType || entry.label, chart);
+
+          if (iconEntry?.status === "loaded") {
+            ctx.drawImage(iconEntry.image, x, top, size, size);
+            return;
+          }
+
           const radius = 2;
           ctx.beginPath();
           ctx.moveTo(x + radius, top);
@@ -122,8 +159,9 @@ export function createChartsController() {
                 CHART_COLORS.bar,
               );
             },
-            borderRadius: 10,
+            borderRadius: 8,
             borderSkipped: false,
+            barThickness: 18,
           },
         ],
       },
@@ -163,6 +201,11 @@ export function createChartsController() {
                 : "default";
           }
         },
+        layout: {
+          padding: {
+            top: 0,
+          },
+        },
         plugins: {
           legend: {
             display: false,
@@ -170,11 +213,21 @@ export function createChartsController() {
         },
         scales: {
           x: {
+            ticks: {
+              font: {
+                weight: 600,
+              },
+            },
             grid: {
               color: CHART_COLORS.grid,
             },
           },
           y: {
+            ticks: {
+              font: {
+                weight: 600,
+              },
+            },
             grid: {
               display: false,
             },
@@ -191,16 +244,12 @@ export function createChartsController() {
         datasets: [
           {
             data: atlasData.tuneTypesChart.map((entry) => entry.value),
-            backgroundColor(context) {
-              return createHorizontalBarGradient(
-                context.chart,
-                CHART_COLORS.accentGradientStart,
-                CHART_COLORS.accentGradientEnd,
-                CHART_COLORS.accent,
-              );
-            },
-            borderRadius: 10,
+            backgroundColor: atlasData.tuneTypesChart.map((entry) =>
+              getTuneTypeSymbolColor(entry.rawType || entry.label),
+            ),
+            borderRadius: 8,
             borderSkipped: false,
+            barThickness: 18,
           },
         ],
       },
@@ -229,6 +278,11 @@ export function createChartsController() {
                 : "default";
           }
         },
+        layout: {
+          padding: {
+            top: 0,
+          },
+        },
         plugins: {
           legend: {
             display: false,
@@ -252,6 +306,11 @@ export function createChartsController() {
         scales: {
           x: {
             beginAtZero: true,
+            ticks: {
+              font: {
+                weight: 600,
+              },
+            },
             grid: {
               color: CHART_COLORS.grid,
             },
@@ -259,7 +318,10 @@ export function createChartsController() {
           y: {
             ticks: {
               autoSkip: false,
-              padding: 18,
+              padding: 30,
+              font: {
+                weight: 600,
+              },
             },
             grid: {
               display: false,
@@ -270,10 +332,131 @@ export function createChartsController() {
     });
 
     chartInstances.push(topPlacesChart, tuneTypesChart);
+
+    if (canvasElements.placeTypes && atlasData.placeTypesChart?.length) {
+      const placeTypesChart = new window.Chart(canvasElements.placeTypes, {
+        type: "bar",
+        data: {
+          labels: atlasData.placeTypesChart.map((e) => e.label),
+          datasets: [
+            {
+              data: atlasData.placeTypesChart.map((e) => e.value),
+              backgroundColor(context) {
+                return createHorizontalBarGradient(
+                  context.chart,
+                  CHART_COLORS.accentGradientStart,
+                  CHART_COLORS.accentGradientEnd,
+                  CHART_COLORS.accent,
+                );
+              },
+              borderRadius: 8,
+              borderSkipped: false,
+              barThickness: 18,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          maintainAspectRatio: false,
+          onClick(event) {
+            if (typeof interactions.onPlaceTypeSelect !== "function") {
+              return;
+            }
+            const entry = getCategoryEntryFromEvent(
+              placeTypesChart,
+              event,
+              atlasData.placeTypesChart,
+            );
+            if (entry && entry.label) {
+              interactions.onPlaceTypeSelect(entry.rawType || entry.label);
+            }
+          },
+          onHover(event) {
+            if (event.native && event.native.target) {
+              event.native.target.style.cursor =
+                getCategoryEntryFromEvent(placeTypesChart, event, atlasData.placeTypesChart)
+                  ? "pointer"
+                  : "default";
+            }
+          },
+          layout: { padding: { top: 0 } },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { font: { weight: 600 } },
+              grid: { color: CHART_COLORS.grid },
+            },
+            y: {
+              ticks: { font: { weight: 600 } },
+              grid: { display: false },
+            },
+          },
+        },
+      });
+      chartInstances.push(placeTypesChart);
+    }
+  }
+
+  function renderPlaceDetailChart(canvasElement, placeChartData) {
+    if (!window.Chart || !canvasElement || !placeChartData.length) {
+      return;
+    }
+
+    const chart = new window.Chart(canvasElement, {
+      type: "bar",
+      plugins: [createTuneTypeTickDotsPlugin(placeChartData)],
+      data: {
+        labels: placeChartData.map((e) => e.label),
+        datasets: [
+          {
+            data: placeChartData.map((e) => e.value),
+            backgroundColor: placeChartData.map((e) =>
+              getTuneTypeSymbolColor(e.rawType || e.label),
+            ),
+            borderRadius: 8,
+            borderSkipped: false,
+            barThickness: 18,
+          },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        maintainAspectRatio: false,
+        layout: { padding: { top: 0 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const value = Number(context.raw) || 0;
+                const total = placeChartData.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+                const percent = total > 0 ? (value / total) * 100 : 0;
+                return `${value} ${value === 1 ? "tune" : "tunes"} (${percent.toFixed(1)}%)`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { font: { weight: 600 }, stepSize: 1 },
+            grid: { color: CHART_COLORS.grid },
+          },
+          y: {
+            ticks: { autoSkip: false, padding: 30, font: { weight: 600 } },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+
+    chartInstances.push(chart);
   }
 
   return {
     destroyAll,
     renderOverviewCharts,
+    renderPlaceDetailChart,
   };
 }

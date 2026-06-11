@@ -1,7 +1,16 @@
-import { TUNE_TYPE_ORDER, formatTuneTypeLabel, getTuneTypeColor, getTuneTypeKey } from "./data.js";
+import {
+  formatTuneTypeLabel,
+  getTuneTypeColor,
+  getTuneTypeIconPath,
+  getTuneTypeKey,
+  TUNE_TYPE_DEFINITIONS,
+} from "./data.js";
+
+const TUNE_TYPE_DEF_BY_MAPS_FROM = new Map(
+  TUNE_TYPE_DEFINITIONS.map((d) => [d.mapsFrom, d]),
+);
 
 const numberFormatter = new Intl.NumberFormat("en-US");
-const TUNE_TYPE_ORDER_INDEX = new Map(TUNE_TYPE_ORDER.map((type, index) => [type, index]));
 
 function escapeHtml(value) {
   return String(value)
@@ -27,6 +36,25 @@ const DEFAULT_TUNE_AUDIO_STATUS_MESSAGE =
 const DEFAULT_TUNE_AUDIO_SPEED_VALUE = 0;
 const MIN_TUNE_AUDIO_SPEED_VALUE = -10;
 const MAX_TUNE_AUDIO_SPEED_VALUE = 2;
+const TUNE_AUDIO_SPEED_PRESETS = Object.freeze({
+  fast: 0,
+  medium: -2,
+  slow: -4,
+});
+const TUNE_AUDIO_TEMPO_BY_TYPE = Object.freeze({
+  barndance: "medium",
+  hornpipe: "medium",
+  jig: "fast",
+  march: "slow",
+  mazurka: "slow",
+  polka: "fast",
+  reel: "fast",
+  slide: "fast",
+  slipJig: "medium",
+  strathspey: "slow",
+  threeTwo: "slow",
+  waltz: "slow",
+});
 const DEFAULT_TUNE_AUDIO_MILLISECONDS_PER_MEASURE = 1000;
 const TUNE_AUDIO_PLAYBACK_START_DELAY_MS = 50;
 const TUNE_AUDIO_SOUNDFONT_KIT = "MusyngKite";
@@ -245,28 +273,58 @@ function getTheSessionDefaultTuneAudioMillisecondsPerMeasure(abcText) {
   return DEFAULT_TUNE_AUDIO_MILLISECONDS_PER_MEASURE;
 }
 
+function getTuneAudioTempoPreset(type) {
+  const tuneTypeKey = getTuneTypeKey(type);
+  return TUNE_AUDIO_TEMPO_BY_TYPE[tuneTypeKey] || "fast";
+}
+
 function formatTuneAudioSpeedLabel(speedValue) {
   const resolvedSpeedValue = normalizeTuneAudioSpeedValue(speedValue);
 
-  if (resolvedSpeedValue === 0) {
-    return "Default";
+  if (resolvedSpeedValue === -1) {
+    return "Medium-Fast";
   }
 
-  if (resolvedSpeedValue < 0) {
-    const stepCount = Math.abs(resolvedSpeedValue);
-    return `${stepCount} step${stepCount === 1 ? "" : "s"} slower`;
+  if (resolvedSpeedValue === -3) {
+    return "Medium-Slow";
   }
 
-  return `${resolvedSpeedValue} step${resolvedSpeedValue === 1 ? "" : "s"} faster`;
+  let baselineTempo = "medium";
+
+  if (resolvedSpeedValue >= TUNE_AUDIO_SPEED_PRESETS.fast) {
+    baselineTempo = "fast";
+  } else if (resolvedSpeedValue <= TUNE_AUDIO_SPEED_PRESETS.slow) {
+    baselineTempo = "slow";
+  }
+
+  const baselineSpeedValue = TUNE_AUDIO_SPEED_PRESETS[baselineTempo];
+  const tempoLabel =
+    baselineTempo.charAt(0).toUpperCase() + baselineTempo.slice(1);
+  const speedOffset = resolvedSpeedValue - baselineSpeedValue;
+
+  if (speedOffset === 0) {
+    return tempoLabel;
+  }
+
+  const stepCount = Math.abs(speedOffset);
+  const direction = speedOffset < 0 ? "slower" : "faster";
+  return `${stepCount} step${stepCount === 1 ? "" : "s"} ${direction} than ${tempoLabel}`;
 }
 
-function createTuneAudioState(tuneId = null, overrides = {}) {
+function getTuneAudioDefaultSpeedValue(type) {
+  const tempo = getTuneAudioTempoPreset(type);
+  return TUNE_AUDIO_SPEED_PRESETS[tempo];
+}
+
+function createTuneAudioState(tuneId = null, overrides = {}, tuneType = null) {
   return {
     tuneId: tuneId ? String(tuneId) : null,
     status: "idle",
     message: DEFAULT_TUNE_AUDIO_STATUS_MESSAGE,
     settingKey: "",
-    speedValue: DEFAULT_TUNE_AUDIO_SPEED_VALUE,
+    speedValue: tuneType
+      ? getTuneAudioDefaultSpeedValue(tuneType)
+      : DEFAULT_TUNE_AUDIO_SPEED_VALUE,
     instrumentProgram: DEFAULT_TUNE_AUDIO_INSTRUMENT_PROGRAM,
     ...overrides,
   };
@@ -330,7 +388,9 @@ function renderTuneAudioButtonContent(audioState) {
 function renderTuneAudioCard(selectedTune, audioState) {
   const tuneId = String(selectedTune?.id || "");
   const resolvedAudioState =
-    audioState?.tuneId === tuneId ? audioState : createTuneAudioState(tuneId);
+    audioState?.tuneId === tuneId
+      ? audioState
+      : createTuneAudioState(tuneId, {}, selectedTune?.type);
   const resolvedSpeedValue = normalizeTuneAudioSpeedValue(resolvedAudioState.speedValue);
   const resolvedInstrumentProgram = normalizeTuneAudioInstrumentProgram(
     resolvedAudioState.instrumentProgram,
@@ -379,7 +439,7 @@ function renderTuneAudioCard(selectedTune, audioState) {
           </div>
           <div class="tune-audio__speed">
             <div class="tune-audio__speed-header">
-              <p class="tune-audio__speed-label">Playback speed</p>
+              <p class="tune-audio__speed-label">Playback speed:</p>
               <p class="tune-audio__speed-value">${escapeHtml(
                 formatTuneAudioSpeedLabel(resolvedSpeedValue),
               )}</p>
@@ -403,13 +463,13 @@ function renderTuneAudioCard(selectedTune, audioState) {
           </div>
         </div>
         <p class="tune-audio__copy">
-          This plays the most popular cached setting. For more settings and notation,
+          This plays the most popular cached setting. For more settings and notation, view this tune on 
           <a
             class="metadata-link"
             href="${escapeHtml(getTheSessionTuneUrl(tuneId))}"
             target="_blank"
             rel="noreferrer"
-          >view this tune on The Session</a>.
+          >The Session</a>.
         </p>
         ${
           statusMessage
@@ -529,17 +589,71 @@ function renderMetaPart(part) {
   return `<span>${escapeHtml(part)}</span>`;
 }
 
+function getTuneTypeFilterHref(type) {
+  const tuneTypeKey = getTuneTypeKey(type);
+  const searchParams = new URLSearchParams({ tab: "tunes" });
+
+  if (tuneTypeKey) {
+    searchParams.set("type", tuneTypeKey);
+  }
+
+  return `?${searchParams.toString()}`;
+}
+
+function renderTuneTypeLink(type, label = type, className = "") {
+  const displayLabel = label === type ? formatTuneTypeLabel(type) : label;
+  const normalizedClassName = className ? ` ${className}` : "";
+
+  return `
+    <a class="tune-type-link${normalizedClassName}" href="${escapeHtml(getTuneTypeFilterHref(type))}">
+      <span>${escapeHtml(displayLabel)}</span>
+    </a>
+  `.trim();
+}
+
 function renderTuneTypeDot(type, label = type, className = "") {
   const displayLabel = label === type ? formatTuneTypeLabel(type) : label;
   const normalizedClassName = className ? ` ${className}` : "";
+  const iconPath = getTuneTypeIconPath(type);
   return `
-    <span class="tune-type-inline${normalizedClassName}">
-      <span
-        class="tune-type-dot"
-        style="--tune-type-color: ${escapeHtml(getTuneTypeColor(type))}"
-        aria-hidden="true"
-      ></span>
+    <a class="tune-type-inline tune-type-link${normalizedClassName}" href="${escapeHtml(
+      getTuneTypeFilterHref(type),
+    )}">
+      ${renderTuneTypeIcon(type, iconPath)}
       <span>${escapeHtml(displayLabel)}</span>
+    </a>
+  `.trim();
+}
+
+function renderTuneTypeIcon(type, iconPath = getTuneTypeIconPath(type), className = "") {
+  const normalizedClassName = className ? ` ${className}` : "";
+  const fallbackColor = escapeHtml(getTuneTypeColor(type));
+
+  if (!iconPath) {
+    return `
+      <span
+        class="tune-type-icon${normalizedClassName}"
+        style="--tune-type-color: ${fallbackColor}"
+        aria-hidden="true"
+      >
+        <span class="tune-type-icon__fallback"></span>
+      </span>
+    `.trim();
+  }
+
+  return `
+    <span
+      class="tune-type-icon${normalizedClassName}"
+      style="--tune-type-color: ${fallbackColor}"
+      aria-hidden="true"
+    >
+      <img
+        class="tune-type-icon__image"
+        src="${escapeHtml(iconPath)}"
+        alt=""
+        onerror="this.hidden=true;this.nextElementSibling.hidden=false"
+      >
+      <span class="tune-type-icon__fallback" hidden></span>
     </span>
   `.trim();
 }
@@ -565,19 +679,22 @@ function formatTuneCountLabel(countValue) {
   return `${numberFormatter.format(count)} tune${count === 1 ? "" : "s"}`;
 }
 
-function renderPlaceListTuneCells(place) {
+function renderPlaceListTuneCells(place, atlasData) {
   const tunes = Array.isArray(place?.tunes) ? place.tunes : [];
   if (tunes.length === 0) {
     return "";
   }
 
+  const tuneTypeFrequencyIndex = new Map(
+    (atlasData?.tuneTypes || []).map((type, index) => [getTuneTypeKey(type), index]),
+  );
   const sortedTunes = tunes
     .map((tune, index) => ({ tune, index }))
     .sort((leftEntry, rightEntry) => {
       const leftTypeRank =
-        TUNE_TYPE_ORDER_INDEX.get(getTuneTypeKey(leftEntry.tune.type)) ?? Number.MAX_SAFE_INTEGER;
+        tuneTypeFrequencyIndex.get(getTuneTypeKey(leftEntry.tune.type)) ?? Number.MAX_SAFE_INTEGER;
       const rightTypeRank =
-        TUNE_TYPE_ORDER_INDEX.get(getTuneTypeKey(rightEntry.tune.type)) ?? Number.MAX_SAFE_INTEGER;
+        tuneTypeFrequencyIndex.get(getTuneTypeKey(rightEntry.tune.type)) ?? Number.MAX_SAFE_INTEGER;
 
       if (leftTypeRank !== rightTypeRank) {
         return leftTypeRank - rightTypeRank;
@@ -597,9 +714,10 @@ function renderPlaceListTuneCells(place) {
           (tune) => `
             <span
               class="browse-list__tune-cell"
-              style="--tune-type-color: ${escapeHtml(getTuneTypeColor(tune.type))}"
               title="${escapeHtml(`${tune.primaryName} (${formatTuneTypeLabel(tune.type)})`)}"
-            ></span>
+            >
+              ${renderTuneTypeIcon(tune.type, getTuneTypeIconPath(tune.type), "tune-type-icon--compact")}
+            </span>
           `,
         )
         .join("")}
@@ -615,7 +733,7 @@ function renderPlaceListMeta(place, atlasData, options = {}) {
   ];
 
   if (includeTuneCells) {
-    parts.push({ markup: renderPlaceListTuneCells(place), omitSeparator: true });
+    parts.push({ markup: renderPlaceListTuneCells(place, atlasData), omitSeparator: true });
   }
 
   return renderMetaLine(parts);
@@ -633,7 +751,8 @@ function renderBrowseListCount(value, singularLabel) {
 }
 
 function duplicateAwarePlaceLabel(place, placeNameCounts) {
-  return place.placeType;
+  const type = place.placeType;
+  return type ? type.charAt(0).toUpperCase() + type.slice(1) : "";
 }
 
 function captureFieldState(root) {
@@ -707,6 +826,104 @@ function parseDurationToMilliseconds(value, fallback = 180) {
   return Number.isFinite(parsedValue) ? parsedValue : fallback;
 }
 
+function renderAccentPattern(accent) {
+  return accent
+    .map((beat) => {
+      const cls =
+        beat === "X"
+          ? "accent-dot accent-dot--strong"
+          : beat === "x"
+            ? "accent-dot accent-dot--medium"
+            : "accent-dot accent-dot--weak";
+      return `<span class="${cls}" aria-hidden="true"></span>`;
+    })
+    .join("");
+}
+
+function renderTempoLegendWord(tempo) {
+  const label = tempo.charAt(0).toUpperCase() + tempo.slice(1);
+  return `
+    <span class="tempo-legend tempo-legend--${tempo}">
+      <span class="tempo-legend__ring" aria-hidden="true"></span>
+      <span class="tempo-legend__label">${escapeHtml(label)}</span>
+    </span>
+  `.trim();
+}
+
+function renderTuneTypeTable(tuneTypesChart) {
+  const ANNOTATIONS = { swing: "¹", scotchSnap: "²" };
+
+  const rows = tuneTypesChart
+    .map(({ rawType }) => {
+      const def = TUNE_TYPE_DEF_BY_MAPS_FROM.get(rawType);
+      if (!def) return "";
+      const tempoLabel = def.tempo.charAt(0).toUpperCase() + def.tempo.slice(1);
+      const tuneTypeHref = getTuneTypeFilterHref(def.key);
+      const annotation =
+        (def.swing ? `<sup class="tune-type-annotation">${ANNOTATIONS.swing}</sup>` : "") +
+        (def.scotchSnap ? `<sup class="tune-type-annotation">${ANNOTATIONS.scotchSnap}</sup>` : "");
+      return `
+        <tr class="tune-type-row">
+          <td class="tune-type-row__icon">
+            <a class="tune-type-link tune-type-link--table-icon" href="${escapeHtml(
+              tuneTypeHref,
+            )}" aria-label="${escapeHtml(`${def.label} tunes`)}">
+              <img src="${escapeHtml(def.iconPath)}" alt="${escapeHtml(def.label)}" class="tune-type-table-icon" />
+            </a>
+          </td>
+          <td class="tune-type-row__name">${renderTuneTypeLink(def.key, def.label, "tune-type-link--table-name")}${annotation}</td>
+          <td class="tune-type-row__accent">
+            <span class="accent-pattern">${renderAccentPattern(def.accent)}</span>
+          </td>
+          <td class="tune-type-row__tempo">${escapeHtml(tempoLabel)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const annotationNotes = [];
+  const hasSwing = tuneTypesChart.some(({ rawType }) => TUNE_TYPE_DEF_BY_MAPS_FROM.get(rawType)?.swing);
+  const hasScotch = tuneTypesChart.some(({ rawType }) => TUNE_TYPE_DEF_BY_MAPS_FROM.get(rawType)?.scotchSnap);
+  const swingNote = hasSwing ? `${ANNOTATIONS.swing} Strong swing rhythm` : "";
+  const scotchNote = hasScotch ? `${ANNOTATIONS.scotchSnap} Scotch Snap` : "";
+  if (hasSwing || hasScotch) annotationNotes.push([swingNote, scotchNote].filter(Boolean).join("  ·  "));
+
+  return `
+    <section class="chart-panel tune-type-table-panel">
+      <div class="panel-block__header">
+        <h2>Tune Type Reference</h2>
+      </div>
+      <div class="tune-type-table-wrap">
+        <table class="tune-type-table">
+          <thead>
+            <tr>
+              <th colspan="2">Type</th>
+              <th>Accent Pattern</th>
+              <th>Tempo</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      
+      <div class="tune-type-table-notes">
+        <div class="tune-type-table-legend">
+          <span class="ttl-item"><span class="accent-dot accent-dot--strong"></span> Strong beat</span>
+          <span class="ttl-item"><span class="accent-dot accent-dot--medium"></span> Medium beat</span>
+          <span class="ttl-item"><span class="accent-dot accent-dot--weak"></span> Weak beat</span>
+        </div>
+        ${annotationNotes.map((n) => `<p class="tune-type-table-note">${escapeHtml(n)}</p>`).join("")}
+        <p class="tune-type-table-note">This table represents typical conventions.</p>
+      </div>
+    </section>
+  `;
+}
+
+function getChartRowHeight(count, baseHeight = 30, maxCount = 12) {
+  const scale = 0.9 + 0.3 * (1 - Math.min(count, maxCount) / maxCount);
+  return Math.round(baseHeight * scale);
+}
+
 function renderOverview(atlasData) {
   const metricActions = {
     Places: "open-overview-places",
@@ -733,6 +950,17 @@ function renderOverview(atlasData) {
           .join("")}
       </section>
 
+      ${renderTuneTypeTable(atlasData.tuneTypesChart)}
+
+      <section class="chart-panel">
+        <div class="panel-block__header">
+          <h2>Tune Types by Count</h2>
+        </div>
+        <div class="chart-frame chart-frame--bars chart-frame--tune-types">
+          <canvas id="tuneTypesChart" aria-label="Mapped tune types chart"></canvas>
+        </div>
+      </section>
+
       <section class="chart-panel">
         <div class="panel-block__header">
           <h2>Place Names by Tune Count</h2>
@@ -744,10 +972,10 @@ function renderOverview(atlasData) {
 
       <section class="chart-panel">
         <div class="panel-block__header">
-          <h2>Tune Types by Count</h2>
+          <h2>Place Types by Tune Count</h2>
         </div>
-        <div class="chart-frame chart-frame--bars chart-frame--tune-types">
-          <canvas id="tuneTypesChart" aria-label="Mapped tune types chart"></canvas>
+        <div class="chart-frame chart-frame--bars chart-frame--place-types">
+          <canvas id="placeTypesChart" aria-label="Place types by tune count chart"></canvas>
         </div>
       </section>
 
@@ -775,11 +1003,15 @@ function renderSharedMetadata(siteMetadata) {
 function renderPlacesList(context) {
   const { filteredPlaces, state, atlasData } = context;
 
+  const placeTypes = [...new Set(atlasData.places.map((p) => p.placeType).filter(Boolean))]
+    .sort()
+    .sort((a, b) => (a === "island") - (b === "island"));
+
   return `
     <div class="sidebar-section">
       <section class="control-panel">
         <label class="field">
-          <span>Search related place</span>
+          <span>Search related places</span>
           <input
             class="text-input"
             type="search"
@@ -788,6 +1020,25 @@ function renderPlacesList(context) {
             value="${escapeHtml(state.placesSearch)}"
           />
         </label>
+
+        <div class="control-row control-row--filter">
+          <label class="field field--inline">
+            <span>Type</span>
+            <select class="select-input" data-field="places-type-filter">
+              <option value="all" ${state.placesTypeFilter === "all" ? "selected" : ""}>All types</option>
+              ${placeTypes.map((type) => `<option value="${escapeHtml(type)}" ${state.placesTypeFilter === type ? "selected" : ""}>${escapeHtml(type.charAt(0).toUpperCase() + type.slice(1))}</option>`).join("")}
+            </select>
+          </label>
+          <button
+            class="filter-reset-button"
+            type="button"
+            data-action="reset-places-type-filter"
+            ${state.placesTypeFilter === "all" ? "disabled" : ""}
+          >
+            Reset
+            ${renderUiIcon(UI_ICONS.reset, "button-icon button-icon--reset")}
+          </button>
+        </div>
 
         <div class="control-row">
           <label class="field field--inline">
@@ -850,8 +1101,22 @@ function renderPlacesList(context) {
   `;
 }
 
+function buildPlaceTuneTypesChart(tunes, atlasData) {
+  const countByType = new Map();
+  for (const tune of tunes) {
+    const type = tune.type;
+    countByType.set(type, (countByType.get(type) || 0) + 1);
+  }
+  return [...countByType.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([rawType, value]) => {
+      const def = atlasData.tuneTypesChart.find((e) => e.rawType === rawType);
+      return { rawType, label: def?.label ?? rawType, value };
+    });
+}
+
 function renderPlaceDetail(context, backLink) {
-  const { selectedPlace } = context;
+  const { selectedPlace, atlasData } = context;
   const resolvedBackLink = backLink || {
     action: "back-to-places-list",
     label: "Back to places",
@@ -870,21 +1135,40 @@ function renderPlaceDetail(context, backLink) {
       <header class="detail-header">
         <p class="eyebrow">Place detail</p>
         <h2 class="detail-title">${escapeHtml(selectedPlace.name)}</h2>
-        <p class="detail-subtitle">${escapeHtml(selectedPlace.placeType)}</p>
+        <p class="detail-subtitle">${escapeHtml(selectedPlace.placeType ? selectedPlace.placeType.charAt(0).toUpperCase() + selectedPlace.placeType.slice(1) : "")}</p>
       </header>
 
-      <dl class="detail-grid">
-        ${
-          selectedPlace.irishName
-            ? `<div><dt>Irish name</dt><dd>${escapeHtml(selectedPlace.irishName)}</dd></div>`
-            : ""
-        }
-        <div><dt>Tune count</dt><dd>${numberFormatter.format(selectedPlace.tuneCount)}</dd></div>
-      </dl>
+      ${
+        selectedPlace.irishName
+          ? `<dl class="detail-grid"><div><dt>Irish name</dt><dd>${escapeHtml(selectedPlace.irishName)}</dd></div></dl>`
+          : ""
+      }
+
+      ${selectedPlace.tunes.length > 0 ? `
+      <section class="chart-panel chart-panel--place-tune-types">
+        <div class="panel-block__header">
+          <h3>Tune types</h3>
+        </div>
+        <div class="chart-frame chart-frame--bars chart-frame--tune-types chart-frame--place-tune-types">
+          <canvas id="placeTuneTypesChart" aria-label="Tune types chart for this place"></canvas>
+        </div>
+      </section>` : ""}
 
       <section class="detail-card">
         <div class="panel-block__header">
-          <h3>Tunes related to this place</h3>
+          <h3>Related tunes</h3>
+        </div>
+
+        <div class="result-row">
+          <p class="result-count">${numberFormatter.format(selectedPlace.tunes.length)} tune${selectedPlace.tunes.length === 1 ? "" : "s"}</p>
+          <button
+            class="random-button"
+            type="button"
+            data-action="random-tune-from-place"
+          >
+            Random tune
+            ${renderUiIcon(UI_ICONS.random, "button-icon button-icon--random")}
+          </button>
         </div>
 
         <ul class="browse-list">
@@ -920,6 +1204,11 @@ function renderPlaceDetail(context, backLink) {
 
 function renderTunesList(context) {
   const { filteredTunes, state, atlasData } = context;
+  const selectedTuneType =
+    state.tunesTypeFilter === "all" ? null : state.tunesTypeFilter;
+  const selectedTuneTypeLabel = selectedTuneType
+    ? formatTuneTypeLabel(selectedTuneType)
+    : "All types";
 
   return `
     <div class="sidebar-section">
@@ -936,21 +1225,51 @@ function renderTunesList(context) {
         </label>
 
         <div class="control-row control-row--filter">
-          <label class="field field--inline">
+          <div class="field field--inline">
             <span>Type</span>
-            <select class="select-input" data-field="tunes-type-filter">
-              <option value="all">All types</option>
-              ${atlasData.tuneTypes
-                .map(
-                  (type) => `
-                    <option value="${escapeHtml(type)}" ${
-                      state.tunesTypeFilter === type ? "selected" : ""
-                    }>${escapeHtml(formatTuneTypeLabel(type))}</option>
-                  `,
-                )
-                .join("")}
-            </select>
-          </label>
+            <details class="type-select">
+              <summary class="type-select__trigger">
+                <span class="type-select__value">
+                  ${selectedTuneType ? renderTuneTypeIcon(selectedTuneType) : ""}
+                  <span>${escapeHtml(selectedTuneTypeLabel)}</span>
+                </span>
+              </summary>
+              <div class="type-select__menu" role="listbox" aria-label="Tune type">
+                <button
+                  class="type-select__option ${
+                    state.tunesTypeFilter === "all" ? "is-selected" : ""
+                  }"
+                  type="button"
+                  role="option"
+                  aria-selected="${state.tunesTypeFilter === "all"}"
+                  data-action="select-tunes-type-filter"
+                  data-tune-type="all"
+                >
+                  <span class="type-select__icon-placeholder" aria-hidden="true"></span>
+                  <span>All types</span>
+                </button>
+                ${atlasData.tuneTypes
+                  .map(
+                    (type) => `
+                      <button
+                        class="type-select__option ${
+                          state.tunesTypeFilter === type ? "is-selected" : ""
+                        }"
+                        type="button"
+                        role="option"
+                        aria-selected="${state.tunesTypeFilter === type}"
+                        data-action="select-tunes-type-filter"
+                        data-tune-type="${escapeHtml(type)}"
+                      >
+                        ${renderTuneTypeIcon(type)}
+                        <span>${escapeHtml(formatTuneTypeLabel(type))}</span>
+                      </button>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </details>
+          </div>
           <button
             class="filter-reset-button"
             type="button"
@@ -1046,7 +1365,7 @@ function renderTuneDetail(context, tuneAudioState, backLink) {
 
       <header class="detail-header">
         <p class="eyebrow">Tune detail</p>
-        <h2 class="detail-title">${escapeHtml(selectedTune.primaryName)}</h2>
+        <h2 class="detail-title detail-title--tune">${escapeHtml(selectedTune.primaryName)}</h2>
         <p class="detail-subtitle">${renderTuneTypeDot(
           selectedTune.type,
           selectedTune.type,
@@ -1058,7 +1377,7 @@ function renderTuneDetail(context, tuneAudioState, backLink) {
 
       <section class="detail-card">
         <div class="panel-block__header">
-          <h3>Related Places</h3>
+          <h3>Related places</h3>
         </div>
 
         <ul class="browse-list">
@@ -1390,9 +1709,14 @@ export function createUIController({ elements, actions, charts }) {
 
   function getTuneAudioSpeedValue(tuneId = null) {
     const normalizedTuneId = String(tuneId || "");
+    const selectedTune = latestRenderContext?.selectedTune;
     const resolvedSpeedValue =
       normalizedTuneId && tuneAudioState?.tuneId !== normalizedTuneId
-        ? DEFAULT_TUNE_AUDIO_SPEED_VALUE
+        ? getTuneAudioDefaultSpeedValue(
+            selectedTune && String(selectedTune.id) === normalizedTuneId
+              ? selectedTune.type
+              : null,
+          )
         : tuneAudioState?.speedValue;
 
     return normalizeTuneAudioSpeedValue(resolvedSpeedValue);
@@ -1475,10 +1799,10 @@ export function createUIController({ elements, actions, charts }) {
     }
   }
 
-  function resetTuneAudioState(tuneId = null) {
+  function resetTuneAudioState(tuneId = null, tuneType = null) {
     tuneAudioRequestId += 1;
     stopTuneAudioPlayback();
-    tuneAudioState = createTuneAudioState(tuneId);
+    tuneAudioState = createTuneAudioState(tuneId, {}, tuneType);
   }
 
   function isTuneDetailVisible(tuneId) {
@@ -1998,7 +2322,7 @@ export function createUIController({ elements, actions, charts }) {
       return;
     }
 
-    const { action, placeId, tuneId } = actionElement.dataset;
+    const { action, placeId, tuneId, tuneType } = actionElement.dataset;
 
     if (action === "select-place") {
       captureCurrentListSnapshot("places");
@@ -2031,6 +2355,16 @@ export function createUIController({ elements, actions, charts }) {
       queueTabCommit("tunes", () => {
         actions.selectTune(tuneId, { preservePlace: true, focusMode: "none" });
       });
+    } else if (action === "random-tune-from-place") {
+      const randomTune = getRandomArrayItem(latestRenderContext?.selectedPlace?.tunes);
+      if (!randomTune) {
+        return;
+      }
+
+      rememberBackTarget(getTuneDetailViewKey(randomTune.id));
+      queueTabCommit("tunes", () => {
+        actions.selectTune(randomTune.id, { preservePlace: true, focusMode: "none" });
+      });
     } else if (action === "open-overview-places") {
       queueTabCommit("places", () => {
         actions.openPlacesIndex();
@@ -2039,8 +2373,12 @@ export function createUIController({ elements, actions, charts }) {
       queueTabCommit("tunes", () => {
         actions.openTunesIndex();
       });
+    } else if (action === "reset-places-type-filter") {
+      actions.setPlacesTypeFilter("all");
     } else if (action === "reset-tunes-type-filter") {
       actions.setTunesTypeFilter("all");
+    } else if (action === "select-tunes-type-filter") {
+      actions.setTunesTypeFilter(tuneType || "all");
     } else if (action === "view-place-on-map") {
       rememberBackTarget(getPlaceDetailViewKey(placeId));
       if ((latestState?.activeTab ?? null) !== "places") {
@@ -2095,8 +2433,8 @@ export function createUIController({ elements, actions, charts }) {
     const field = event.target.dataset.field;
     if (field === "places-sort") {
       actions.setPlacesSort(event.target.value);
-    } else if (field === "tunes-type-filter") {
-      actions.setTunesTypeFilter(event.target.value);
+    } else if (field === "places-type-filter") {
+      actions.setPlacesTypeFilter(event.target.value);
     } else if (field === "tunes-sort") {
       actions.setTunesSort(event.target.value);
     } else if (field === "tune-audio-instrument") {
@@ -2140,7 +2478,7 @@ export function createUIController({ elements, actions, charts }) {
           resetTuneAudioState();
         }
       } else if (tuneAudioState.tuneId !== String(selectedTune.id)) {
-        resetTuneAudioState(selectedTune.id);
+        resetTuneAudioState(selectedTune.id, selectedTune.type);
       }
 
       const isMobileSidebarOpen = isNarrowViewport && state.mobilePanel === "sidebar";
@@ -2199,10 +2537,32 @@ export function createUIController({ elements, actions, charts }) {
         if (!restoredOverviewView && shouldScrollSidebarToTop) {
           elements.sidebarContent.scrollTop = 0;
         }
+        const tuneTypesCanvasEl = elements.sidebarContent.querySelector("#tuneTypesChart");
+        if (tuneTypesCanvasEl) {
+          const rowHeight = 30;
+          const canvasHeight = (atlasData.tuneTypesChart.length + 1) * rowHeight;
+          tuneTypesCanvasEl.style.height = `${canvasHeight}px`;
+          tuneTypesCanvasEl.parentElement.style.height = `${canvasHeight}px`;
+        }
+        const topPlacesCanvasEl = elements.sidebarContent.querySelector("#topPlacesChart");
+        if (topPlacesCanvasEl) {
+          const rowHeight = 30;
+          const canvasHeight = (atlasData.topPlacesChart.length + 1) * rowHeight;
+          topPlacesCanvasEl.style.height = `${canvasHeight}px`;
+          topPlacesCanvasEl.parentElement.style.height = `${canvasHeight}px`;
+        }
+        const placeTypesCanvasEl = elements.sidebarContent.querySelector("#placeTypesChart");
+        if (placeTypesCanvasEl) {
+          const rowHeight = 31;
+          const canvasHeight = (atlasData.placeTypesChart.length + 1) * rowHeight;
+          placeTypesCanvasEl.style.height = `${canvasHeight}px`;
+          placeTypesCanvasEl.parentElement.style.height = `${canvasHeight}px`;
+        }
         charts.renderOverviewCharts(
           {
-            topPlaces: elements.sidebarContent.querySelector("#topPlacesChart"),
-            tuneTypes: elements.sidebarContent.querySelector("#tuneTypesChart"),
+            topPlaces: topPlacesCanvasEl,
+            tuneTypes: tuneTypesCanvasEl,
+            placeTypes: placeTypesCanvasEl,
           },
           atlasData,
           {
@@ -2222,6 +2582,11 @@ export function createUIController({ elements, actions, charts }) {
                 actions.openTuneTypeFilter(tuneType);
               });
             },
+            onPlaceTypeSelect(placeType) {
+              queueTabCommit("places", () => {
+                actions.openPlaceTypeFilter(placeType);
+              });
+            },
           },
         );
         return;
@@ -2238,6 +2603,17 @@ export function createUIController({ elements, actions, charts }) {
               atlasData,
             });
         restoreFieldState(elements.sidebarContent, fieldState);
+        if (selectedPlace) {
+          const placeChartData = buildPlaceTuneTypesChart(selectedPlace.tunes, atlasData);
+          const canvasEl = elements.sidebarContent.querySelector("#placeTuneTypesChart");
+          if (canvasEl) {
+            const rowHeight = getChartRowHeight(placeChartData.length);
+            const canvasHeight = (placeChartData.length + 1) * rowHeight;
+            canvasEl.style.height = `${canvasHeight}px`;
+            canvasEl.parentElement.style.height = `${canvasHeight + 26}px`;
+          }
+          charts.renderPlaceDetailChart(canvasEl, placeChartData);
+        }
         const restoredPlaceView = restorePendingViewSnapshot(getSidebarViewKey(state));
         if (!selectedPlace) {
           const restoredPlacesList = restoredPlaceView || restorePendingListSnapshot("places");

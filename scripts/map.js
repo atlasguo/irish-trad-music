@@ -8,9 +8,12 @@ import {
 import {
   buildMapCollection,
   formatTuneTypeLabel,
+  getTuneTypeKey,
   TUNE_TYPE_DEFINITIONS,
   TUNE_TYPE_ORDER,
   getTuneTypeColor,
+  getTuneTypeIconPath,
+  getTuneTypeSymbolColor,
 } from "./data.js";
 
 const EMPTY_COLLECTION = {
@@ -87,7 +90,7 @@ const LABEL_MODE_SYMBOL = "symbol";
 const LABEL_MODE_OFF = "off";
 const COUNTY_VISIBILITY_ON = "on";
 const COUNTY_VISIBILITY_OFF = "off";
-const COUNTY_SYMBOL_COLOR = [112, 88, 126];
+const COUNTY_SYMBOL_COLOR = [128, 88, 158];
 const COUNTY_LAYER_IDS = [
   "county-boundaries-glow-wide-layer",
   "county-boundaries-glow-mid-layer",
@@ -101,6 +104,28 @@ const MAP_UI_ICONS = {
 
 function renderMapUiIcon(icon, className = "button-icon") {
   return `<span class="${className}" aria-hidden="true">${icon}</span>`;
+}
+
+function getTuneTypeFilterHref(type) {
+  const tuneTypeKey = getTuneTypeKey(type);
+  const searchParams = new URLSearchParams({ tab: "tunes" });
+
+  if (tuneTypeKey) {
+    searchParams.set("type", tuneTypeKey);
+  }
+
+  return `?${searchParams.toString()}`;
+}
+
+function renderTuneTypeLink(type, label = type, className = "") {
+  const displayLabel = label === type ? formatTuneTypeLabel(type) : label;
+  const normalizedClassName = className ? ` ${className}` : "";
+
+  return `
+    <a class="tune-type-link${normalizedClassName}" href="${escapeHtml(getTuneTypeFilterHref(type))}">
+      <span>${escapeHtml(displayLabel)}</span>
+    </a>
+  `.trim();
 }
 
 const SYMBOL_LABEL_VISUAL_PRIORITY = [
@@ -181,9 +206,9 @@ const CONE_PLACE_MARKER_RADIUS = 42 * CONE_MARKER_RENDER_SCALE;
 const RING_SECTOR_SHADOW_ALPHA = 0.22;
 const RING_SECTOR_SHADOW_OFFSET_X = 1.2 * MARKER_RENDER_SCALE;
 const RING_SECTOR_SHADOW_OFFSET_Y = 2.2 * MARKER_RENDER_SCALE;
-const BLOCK_MARKER_CACHE_VERSION = "v8";
-const RING_MARKER_CACHE_VERSION = "v22";
-const CONE_MARKER_CACHE_VERSION = "v30";
+const BLOCK_MARKER_CACHE_VERSION = "v9";
+const RING_MARKER_CACHE_VERSION = "v27";
+const CONE_MARKER_CACHE_VERSION = "v31";
 const CATEGORY_SYMBOL_LINE_COLOR = [52, 52, 52];
 const BLOCK_SYMBOL_LINE_COLOR = [255, 248, 233];
 const RING_SYMBOL_LINE_COLOR = [255, 248, 233];
@@ -211,6 +236,7 @@ const cachedConeMarkerDataUrls = new Map();
 const cachedConeLegendMarkerDataUrls = new Map();
 const cachedActivePlaceRectDataUrls = new Map();
 let coneReferenceMaxCount = 1;
+let ringTuneTypeDefinitions = TUNE_TYPE_DEFINITIONS;
 const BLOCK_LEGEND_MARKER_COUNTS = Object.fromEntries(
   TUNE_TYPE_ORDER.map((key, index) => [key, TUNE_TYPE_ORDER.length - index]),
 );
@@ -230,6 +256,9 @@ const RING_LEGEND_MARKER_COUNTS = {
 };
 const CONE_LEGEND_RENDER_SCALE = 8;
 const CONE_LEGEND_FILL_COLOR = [108, 108, 108];
+const TUNE_TYPE_SYMBOL_COLOR_MAP = new Map(
+  TUNE_TYPE_DEFINITIONS.map((d) => [d.key, d.squareIconFill]).filter(([, c]) => c),
+);
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -254,13 +283,42 @@ function darkenColor(color, factor = 0.78) {
 function renderTuneTypeDot(type, label = type) {
   const displayLabel = label === type ? formatTuneTypeLabel(type) : label;
   return `
-    <span class="tune-type-inline">
-      <span
-        class="tune-type-dot"
-        style="--tune-type-color: ${escapeHtml(getTuneTypeColor(type))}"
-        aria-hidden="true"
-      ></span>
+    <a class="tune-type-inline tune-type-link" href="${escapeHtml(getTuneTypeFilterHref(type))}">
+      ${renderTuneTypeIcon(type)}
       <span>${escapeHtml(displayLabel)}</span>
+    </a>
+  `.trim();
+}
+
+function renderTuneTypeIcon(type, className = "", iconPath = getTuneTypeIconPath(type), color = null) {
+  const normalizedClassName = className ? ` ${className}` : "";
+  const fallbackColor = escapeHtml(color ?? getTuneTypeColor(type));
+
+  if (!iconPath) {
+    return `
+      <span
+        class="tune-type-icon${normalizedClassName}"
+        style="--tune-type-color: ${fallbackColor}"
+        aria-hidden="true"
+      >
+        <span class="tune-type-icon__fallback"></span>
+      </span>
+    `.trim();
+  }
+
+  return `
+    <span
+      class="tune-type-icon${normalizedClassName}"
+      style="--tune-type-color: ${fallbackColor}"
+      aria-hidden="true"
+    >
+      <img
+        class="tune-type-icon__image"
+        src="${escapeHtml(iconPath)}"
+        alt=""
+        onerror="this.hidden=true;this.nextElementSibling.hidden=false"
+      >
+      <span class="tune-type-icon__fallback" hidden></span>
     </span>
   `.trim();
 }
@@ -603,6 +661,14 @@ function getRingCategoryFillColor(definition) {
   return rgbaToCss(darkenColor(hexToRgb(definition.color), 0.9), 1);
 }
 
+function getTuneTypeSymbolFillColor(definition) {
+  return TUNE_TYPE_SYMBOL_COLOR_MAP.get(definition.key) || getRingCategoryFillColor(definition);
+}
+
+function getSymbolFillColor(key) {
+  return TUNE_TYPE_SYMBOL_COLOR_MAP.get(key) || "#8c8171";
+}
+
 function createBlockLegendMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
   const center = PLACE_MARKER_IMAGE_SIZE / 2;
   const totalCount = TUNE_TYPE_ORDER.reduce(
@@ -634,7 +700,7 @@ function createBlockLegendMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) 
   const sectorMarkup = sectorSlices.map(({ definition, startAngle, endAngle, radius }) => `
       <path
         d="${buildSectorPath(center, radius, startAngle, endAngle)}"
-        fill="${getRingCategoryFillColor(definition)}"
+        fill="${getTuneTypeSymbolFillColor(definition)}"
         stroke="${rgbaToCss(BLOCK_SYMBOL_LINE_COLOR, 0.96)}"
         stroke-width="${strokeWidth}"
         stroke-linejoin="round"
@@ -662,7 +728,7 @@ function createBlockMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
     `.trim();
   }
 
-  const tuneSquares = TUNE_TYPE_DEFINITIONS.flatMap((definition) =>
+  const tuneSquares = ringTuneTypeDefinitions.flatMap((definition) =>
     Array.from({ length: tuneTypeCounts[definition.key] || 0 }, () => definition),
   );
   const columns = Math.ceil(Math.sqrt(totalCount));
@@ -690,7 +756,7 @@ function createBlockMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
         height="${squareSize}"
         rx="${cornerRadius}"
         ry="${cornerRadius}"
-        fill="${getRingCategoryFillColor(definition)}"
+        fill="${getTuneTypeSymbolFillColor(definition)}"
         stroke="${rgbaToCss(BLOCK_SYMBOL_LINE_COLOR, 0.96)}"
         stroke-width="${strokeWidth}"
       />
@@ -714,7 +780,7 @@ function createRingMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
   const outerRadius = getRingOuterRadiusForCount(tuneCount);
   const innerRadius = outerRadius * RING_INNER_RADIUS_RATIO;
   let currentAngle = 0;
-  const nonZeroDefinitions = TUNE_TYPE_DEFINITIONS.filter(
+  const nonZeroDefinitions = ringTuneTypeDefinitions.filter(
     (definition) => (tuneTypeCounts[definition.key] || 0) > 0,
   );
   const sectorSlices = totalCount > 0
@@ -745,7 +811,7 @@ function createRingMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
   const sectorMarkup = sectorSlices.map(({ definition, startAngle, endAngle }) => `
       <path
         d="${buildDonutSectorPath(center, outerRadius, innerRadius, startAngle, endAngle)}"
-        fill="${getRingCategoryFillColor(definition)}"
+        fill="${getTuneTypeSymbolFillColor(definition)}"
       />
     `).join("");
 
@@ -803,13 +869,13 @@ function createConeMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
   const center = CONE_MARKER_IMAGE_SIZE / 2;
   const iconScale = Math.max(getConeMarkerIconSize(tuneCount), 0.001);
   const strokeWidth = +(getConeStrokeWidthForCount(tuneCount) * strokeScale).toFixed(2);
-  const countsByDefinition = TUNE_TYPE_DEFINITIONS.map((definition) => ({
+  const countsByDefinition = ringTuneTypeDefinitions.map((definition) => ({
     definition,
     count: tuneTypeCounts[definition.key] || 0,
   }));
   const innerRadius = CONE_BASELINE_DISPLAY_RADIUS / iconScale;
   const outerRadius = CONE_PLACE_MARKER_RADIUS * CONE_OUTER_RADIUS_RATIO;
-  const slotAngle = 360 / TUNE_TYPE_DEFINITIONS.length;
+  const slotAngle = 360 / ringTuneTypeDefinitions.length;
 
   const barMarkup = countsByDefinition
     .map(({ definition, count }, index) => {
@@ -825,7 +891,7 @@ function createConeMarkerSvg(tuneTypeCounts, tuneCount, strokeScale = 1) {
       return `
       <path
         d="${buildRoundedConePath(center, barOuterRadius, innerRadius, startAngle, endAngle)}"
-        fill="${getRingCategoryFillColor(definition)}"
+        fill="${getTuneTypeSymbolFillColor(definition)}"
         stroke="${rgbaToCss(CONE_SYMBOL_LINE_COLOR, 0.96)}"
         stroke-width="${strokeWidth}"
         stroke-linejoin="round"
@@ -968,6 +1034,68 @@ function createConeLegendMarkerSvg(tuneCount) {
       />
     </svg>
   `.trim();
+}
+
+function createConeDirectionWheelSvg() {
+  // Radial label layout. viewBox is slightly wider than the 236px content area (~0.944 scale),
+  // sized so the longest label ("Strathspey") reaches exactly to either edge.
+  // labelRadius is the maximum that fits "Strathspey" (longest label) at either edge.
+  // gap = labelRadius − outerRadius must be ≥ fontSize/2 so top/bottom labels don't overlap the tip.
+  const viewWidth = 250;
+  const cx = 125;
+  const cy = 65;
+  const outerRadius = 48;
+  const innerRadius = 5;
+  const labelRadius = 55;
+  const slotAngle = 360 / ringTuneTypeDefinitions.length;
+  const strokeWidth = 1.3;
+  const strokeColor = "rgba(255, 248, 233, 0.96)";
+  const textFill = "rgba(19, 45, 41, 0.82)";
+  const fontSize = 12;
+
+  const sectorMarkup = ringTuneTypeDefinitions.map((definition, index) => {
+    const startAngle = index * slotAngle - slotAngle / 2 + CONE_ANGLE_GAP / 2;
+    const endAngle = index * slotAngle + slotAngle / 2 - CONE_ANGLE_GAP / 2;
+    const tuneTypeHref = getTuneTypeFilterHref(definition.key);
+
+    return `
+      <a class="cone-legend__link tune-type-link" href="${escapeHtml(tuneTypeHref)}" aria-label="${escapeHtml(definition.label)}">
+        <path
+          d="${buildRoundedConePath({ x: cx, y: cy }, outerRadius, innerRadius, startAngle, endAngle)}"
+          fill="${getTuneTypeSymbolFillColor(definition)}"
+          stroke="${strokeColor}"
+          stroke-width="${strokeWidth}"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      </a>`;
+  }).join("");
+
+  const labelMarkup = ringTuneTypeDefinitions.map((definition, index) => {
+    const centerAngle = index * slotAngle;
+    const angleRad = (centerAngle * Math.PI) / 180;
+    const lx = +(cx + labelRadius * Math.sin(angleRad)).toFixed(1);
+    const ly = +(cy - labelRadius * Math.cos(angleRad)).toFixed(1);
+    const xDiff = lx - cx;
+    const textAnchor = xDiff > 8 ? "start" : xDiff < -8 ? "end" : "middle";
+    const tuneTypeHref = getTuneTypeFilterHref(definition.key);
+
+    return `
+      <a class="cone-legend__link tune-type-link" href="${escapeHtml(tuneTypeHref)}" aria-label="${escapeHtml(definition.label)}">
+        <text x="${lx}" y="${ly}"
+          font-size="${fontSize}" font-family="Manrope, sans-serif" font-weight="500"
+          fill="${textFill}" text-anchor="${textAnchor}" dominant-baseline="central"
+        >${escapeHtml(definition.label)}</text>
+      </a>`;
+  }).join("");
+
+  const viewHeight = cy + labelRadius + 14;
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${viewHeight}" style="width: 100%; display: block;" aria-label="Cone tune type legend" role="img">
+      ${sectorMarkup}
+      <circle cx="${cx}" cy="${cy}" r="3" fill="rgba(70, 70, 70, 0.88)" />
+      ${labelMarkup}
+    </svg>`.trim();
 }
 
 function getBlockMarkerDataUrl(tuneTypeCounts, tuneCount) {
@@ -1677,54 +1805,33 @@ function renderHoverPopup(place, mapMode = MAP_MODE_TOTAL) {
     return "";
   }
 
-  const tunesMarkup =
-    isNonTotalMapMode(mapMode)
-      ? TUNE_TYPE_DEFINITIONS
-          .filter((definition) => (place.tuneTypeCounts?.[definition.key] || 0) > 0)
-          .map(
-            (definition) => `
-              <li class="map-popup__item">
-                <span class="map-popup__item-label">${renderTuneTypeDot(
-                  definition.mapsFrom,
-                  definition.label,
-                )}</span>
-                <span class="map-popup__item-count">${escapeHtml(
-                  String(place.tuneTypeCounts?.[definition.key] || 0),
-                )}</span>
-              </li>
-            `,
-          )
-          .join("")
-      : (() => {
-          const tuneTypeCounts = new Map();
-          place.tunes.forEach((tune) => {
-            tuneTypeCounts.set(tune.type, (tuneTypeCounts.get(tune.type) || 0) + 1);
-          });
-
-          return [...tuneTypeCounts.entries()]
-            .sort((left, right) => {
-              if (right[1] !== left[1]) {
-                return right[1] - left[1];
-              }
-
-              return left[0].localeCompare(right[0], "en");
-            })
-            .map(
-              ([type, count]) => `
-                <li class="map-popup__item">
-                  <span class="map-popup__item-label">${renderTuneTypeDot(type)}</span>
-                  <span class="map-popup__item-count">${escapeHtml(String(count))}</span>
-                </li>
-              `,
-            )
-            .join("");
-        })();
+  const useSymbolColors = isNonTotalMapMode(mapMode);
+  const tunesMarkup = ringTuneTypeDefinitions
+    .filter((definition) => (place.tuneTypeCounts?.[definition.key] || 0) > 0)
+    .map(
+      (definition) => `
+        <li class="map-popup__item">
+          <a class="map-popup__item-link tune-type-link" href="${escapeHtml(
+            getTuneTypeFilterHref(definition.key),
+          )}">
+            <span class="map-popup__item-symbol">
+              ${renderTuneTypeIcon(definition.mapsFrom, "", undefined, useSymbolColors ? getSymbolFillColor(definition.key) : null)}
+            </span>
+            <span class="map-popup__item-label">${escapeHtml(definition.label)}</span>
+            <span class="map-popup__item-count">${escapeHtml(
+              String(place.tuneTypeCounts?.[definition.key] || 0),
+            )}</span>
+          </a>
+        </li>
+      `,
+    )
+    .join("");
 
   return `
     <div class="map-popup">
       <div class="map-popup__header">
         <strong class="map-popup__title">${escapeHtml(place.name)}</strong>
-        <span class="map-popup__type">${escapeHtml(place.placeType)}</span>
+        <span class="map-popup__type">${escapeHtml(place.placeType ? place.placeType.charAt(0).toUpperCase() + place.placeType.slice(1) : "")}</span>
       </div>
       <p class="map-popup__count">${escapeHtml(String(place.tuneCount))} tune${place.tuneCount === 1 ? "" : "s"}</p>
       <ul class="map-popup__list">
@@ -1812,27 +1919,28 @@ function renderLegendRowsSectionMarkup(mapMode, sizeClassCounts = {}) {
 
 function renderTuneTypeLegendKeyMarkup(tuneTypeTotals = {}, mapMode = MAP_MODE_BLOCK) {
   const legendSlotSize = getLegendSymbolSlotSize(getLegendStyleMode(mapMode));
+  const sortedDefinitions = [...TUNE_TYPE_DEFINITIONS].sort(
+    (left, right) =>
+      (tuneTypeTotals[right.key] || 0) - (tuneTypeTotals[left.key] || 0) ||
+      left.label.localeCompare(right.label, "en"),
+  );
 
   return `
     <ul class="map-legend__key">
-      ${TUNE_TYPE_DEFINITIONS.map(
+      ${sortedDefinitions.map(
         (definition) => `
           <li class="map-legend__key-item">
-            <span class="map-legend__key-symbol" style="width: ${legendSlotSize}px; min-width: ${legendSlotSize}px;">
-              <span
-                class="map-legend__key-swatch"
-                style="--category-color: ${escapeHtml(
-                  mapMode === MAP_MODE_RING || mapMode === MAP_MODE_BLOCK || mapMode === MAP_MODE_CONE
-                    ? getRingCategoryFillColor(definition)
-                    : definition.color,
-                )};"
-                aria-hidden="true"
-              ></span>
-            </span>
-            <span class="map-legend__key-label">
-              ${escapeHtml(definition.label)}
-              <span class="map-legend__key-note">(${escapeHtml(String(tuneTypeTotals[definition.key] || 0))})</span>
-            </span>
+            <a class="map-legend__key-link tune-type-link" href="${escapeHtml(
+              getTuneTypeFilterHref(definition.key),
+            )}">
+              <span class="map-legend__key-symbol" style="width: ${legendSlotSize}px; min-width: ${legendSlotSize}px;">
+                ${renderTuneTypeIcon(definition.mapsFrom, "", undefined, getSymbolFillColor(definition.key))}
+              </span>
+              <span class="map-legend__key-label">
+                ${escapeHtml(definition.label)}
+                <span class="map-legend__key-note">(${escapeHtml(String(tuneTypeTotals[definition.key] || 0))})</span>
+              </span>
+            </a>
           </li>
         `,
       ).join("")}
@@ -1921,8 +2029,8 @@ function renderLegendBodyMarkup(mapMode, categoryTotals = {}, sizeClassCounts = 
   return `
     ${renderLayerControlsMarkup()}
     <div class="map-legend__mode">
-      <p class="map-legend__mode-label">Map mode</p>
-      <div class="map-legend__mode-toggle" role="tablist" aria-label="Map mode">
+      <p class="map-legend__mode-label">Symbol</p>
+      <div class="map-legend__mode-toggle" role="tablist" aria-label="Symbol">
         <button
           class="map-legend__mode-button ${mapMode === MAP_MODE_TOTAL ? "is-active" : ""}"
           type="button"
@@ -1959,7 +2067,15 @@ function renderLegendBodyMarkup(mapMode, categoryTotals = {}, sizeClassCounts = 
         : ""
     }
     ${
-      isNonTotalMapMode(mapMode)
+      mapMode === MAP_MODE_CONE
+        ? `
+          <p class="map-legend__title map-legend__title--secondary">Tune Type</p>
+          ${createConeDirectionWheelSvg()}
+        `
+        : ""
+    }
+    ${
+      isNonTotalMapMode(mapMode) && mapMode !== MAP_MODE_CONE
         ? `
           <p class="map-legend__title map-legend__title--secondary">Tune Type</p>
           ${renderTuneTypeLegendKeyMarkup(categoryTotals, mapMode)}
@@ -2130,6 +2246,12 @@ export function createMapController({
       ? getMapPadding(getViewportPadding())
       : getMapPadding();
   let visiblePlacesById = new Map(atlasData.places.map((place) => [place.id, place]));
+  ringTuneTypeDefinitions = [...TUNE_TYPE_DEFINITIONS].sort(
+    (left, right) =>
+      (atlasData.tuneTypeTotals?.[right.key] || 0) -
+        (atlasData.tuneTypeTotals?.[left.key] || 0) ||
+      left.label.localeCompare(right.label, "en"),
+  );
   coneReferenceMaxCount = Math.max(getMaxTuneTypeCountForPlaces(atlasData.places), 1);
   const pendingTasks = [];
   const blockMarkerPromises = new Map();
@@ -2337,6 +2459,7 @@ export function createMapController({
       updateLayerControlsState();
     }
 
+    legendElement.classList.toggle("map-legend--cone-mode", currentMapMode === MAP_MODE_CONE);
     syncLegendSurfaceState();
 
     legendElement.style.setProperty(
@@ -3294,7 +3417,7 @@ export function createMapController({
         visibility: "none",
       },
       paint: {
-        "text-color": rgbaToCss(COUNTY_SYMBOL_COLOR, 0.82),
+        "text-color": rgbaToCss(COUNTY_SYMBOL_COLOR, 0.95),
         "text-halo-color": "rgba(255, 248, 233, 0.9)",
         "text-halo-width": 1.4,
         "text-halo-blur": 0.4,

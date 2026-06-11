@@ -14,6 +14,7 @@ import {
   buildRingMarkerId,
   loadAtlasData,
   normalizeForSearch,
+  getTuneTypeKey,
   summarizeTuneTypeCounts,
 } from "./data.js";
 import { createChartsController } from "./charts.js";
@@ -23,6 +24,22 @@ import { createUIController } from "./ui.js";
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getInitialStateFromLocation() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const tuneType = getTuneTypeKey(searchParams.get("type"));
+  const initialState = {};
+
+  if (searchParams.get("tab") === "tunes" || tuneType) {
+    initialState.activeTab = "tunes";
+  }
+
+  if (tuneType) {
+    initialState.tunesTypeFilter = tuneType;
+  }
+
+  return initialState;
 }
 
 const elements = {
@@ -183,6 +200,9 @@ function getFilteredPlaces(atlasData, state) {
   const normalizedQuery = normalizeForSearch(state.placesSearch.trim());
 
   return [...atlasData.places]
+    .filter((place) =>
+      state.placesTypeFilter === "all" ? true : place.placeType === state.placesTypeFilter,
+    )
     .filter((place) => {
       if (!normalizedQuery) {
         return true;
@@ -395,6 +415,10 @@ async function bootstrap() {
         setState({ placesSort: value });
       },
 
+      setPlacesTypeFilter(value) {
+        setState({ placesTypeFilter: value });
+      },
+
       setTunesSearch(value) {
         setState({ tunesSearch: value });
       },
@@ -424,6 +448,17 @@ async function bootstrap() {
         setState(nextState);
       },
 
+      openPlaceTypeFilter(placeType) {
+        const nextState = {
+          activeTab: "places",
+          selectedPlaceId: null,
+          placesTypeFilter: placeType,
+          ...getMobileSidebarPanelStatePatch(),
+        };
+
+        setState(nextState);
+      },
+
       openPlacesByName(placeName) {
         const nextState = {
           activeTab: "places",
@@ -444,6 +479,7 @@ async function bootstrap() {
           selectedTuneId: null,
           placesSearch: "",
           placesSort: "alpha",
+          placesTypeFilter: "all",
           ...getMobileSidebarPanelStatePatch(),
         };
 
@@ -470,6 +506,11 @@ async function bootstrap() {
       actions,
       charts,
     });
+
+    const initialState = getInitialStateFromLocation();
+    if (Object.keys(initialState).length > 0) {
+      setState(initialState);
+    }
 
     mapController = createMapController({
       container: elements.mapShell,
